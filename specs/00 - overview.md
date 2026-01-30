@@ -14,3 +14,5 @@
 - uv is used to manage the project, add packages with `uv add PACKAGE_NAME`
 - use ortools package to manage constraints and solvers
 - use sqllite as db, but prepare the road for a fully fledged DB
+- use sqlalchemy as ORM
+- use pydantic to model Data tranfer objects for the API endpoint
