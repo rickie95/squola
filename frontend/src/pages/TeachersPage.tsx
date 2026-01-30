@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { teachersApi, mattersApi } from "../api";
-import type { Teacher, TeacherWithMatters, TeacherCreate, Matter, SchedulePreference } from "../types";
+import type { Teacher, TeacherWithMatters, TeacherCreate, SchedulePreference } from "../types";
 import Modal from "../components/Modal";
 
 const SCHEDULE_PREFERENCES: { value: SchedulePreference; label: string }[] = [
@@ -110,7 +110,7 @@ export default function TeachersPage() {
   };
 
   const handleDelete = (id: number) => {
-    if (window.confirm("Are you sure you want to remove this teacher from the roster?")) {
+    if (globalThis.confirm("Are you sure you want to remove this teacher from the roster?")) {
       deleteMutation.mutate(id);
     }
   };

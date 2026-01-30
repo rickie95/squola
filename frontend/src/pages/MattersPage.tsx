@@ -67,7 +67,7 @@ export default function MattersPage() {
   };
 
   const handleDelete = (id: number) => {
-    if (window.confirm("Are you sure you want to delete this matter?")) {
+    if (globalThis.confirm("Are you sure you want to delete this matter?")) {
       deleteMutation.mutate(id);
     }
   };
