@@ -1,0 +1,164 @@
+"""SQLAlchemy database models for Squola scheduling app."""
+
+from enum import Enum
+from typing import Optional
+
+from sqlalchemy import ForeignKey, String, Table, Column, Integer
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+class Base(DeclarativeBase):
+    """Base class for all models."""
+    pass
+
+
+class SchedulePreference(str, Enum):
+    """Teacher scheduling preferences."""
+    EARLY = "early"  # Prefer first hours
+    LATE = "late"  # Prefer latest hours
+    MINIMIZE_GAPS = "minimize_gaps"  # Group lessons together
+    MAXIMIZE_GAPS = "maximize_gaps"  # More free time between lessons
+    NONE = "none"  # No preference
+
+
+# Association table for teacher-matter relationship (many-to-many)
+teacher_matter_association = Table(
+    "teacher_matter",
+    Base.metadata,
+    Column("teacher_id", Integer, ForeignKey("teachers.id"), primary_key=True),
+    Column("matter_id", Integer, ForeignKey("matters.id"), primary_key=True),
+)
+
+
+class Teacher(Base):
+    """
+    Teacher model.
+    
+    A teacher can:
+    - Teach one or more subject matters
+    - Teach in one or more classes
+    - Have blacklisted hours (if teaching at another school)
+    - Express scheduling preferences
+    """
+    __tablename__ = "teachers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    first_name: Mapped[str] = mapped_column(String(100))
+    last_name: Mapped[str] = mapped_column(String(100))
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    
+    # Scheduling preferences
+    schedule_preference: Mapped[str] = mapped_column(
+        String(50), default=SchedulePreference.NONE.value
+    )
+    
+    # Relationships
+    matters: Mapped[list["Matter"]] = relationship(
+        secondary=teacher_matter_association,
+        back_populates="teachers"
+    )
+    class_assignments: Mapped[list["ClassMatterAssignment"]] = relationship(
+        back_populates="teacher"
+    )
+    blacklisted_slots: Mapped[list["TeacherBlacklistedSlot"]] = relationship(
+        back_populates="teacher",
+        cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return f"Teacher(id={self.id}, name='{self.first_name} {self.last_name}')"
+
+
+class TeacherBlacklistedSlot(Base):
+    """
+    Represents time slots when a teacher is unavailable.
+    Useful for teachers working in multiple schools.
+    """
+    __tablename__ = "teacher_blacklisted_slots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
+    day_of_week: Mapped[int] = mapped_column()  # 0=Monday, 4=Friday
+    hour_slot: Mapped[int] = mapped_column()  # 1-based hour slot
+
+    teacher: Mapped["Teacher"] = relationship(back_populates="blacklisted_slots")
+
+    def __repr__(self) -> str:
+        return f"BlacklistedSlot(teacher_id={self.teacher_id}, day={self.day_of_week}, slot={self.hour_slot})"
+
+
+class SchoolClass(Base):
+    """
+    School class model.
+    
+    A class is identified by a year (roman numeral) and a letter (e.g., IIIA, IIB).
+    Each class has a list of subject matters with assigned teachers.
+    """
+    __tablename__ = "classes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    year: Mapped[str] = mapped_column(String(10))  # Roman numeral: I, II, III, IV, V
+    section: Mapped[str] = mapped_column(String(5))  # Letter: A, B, C, etc.
+    
+    # Relationships
+    matter_assignments: Mapped[list["ClassMatterAssignment"]] = relationship(
+        back_populates="school_class",
+        cascade="all, delete-orphan"
+    )
+
+    @property
+    def name(self) -> str:
+        """Returns the full class name (e.g., IIIA)."""
+        return f"{self.year}{self.section}"
+
+    def __repr__(self) -> str:
+        return f"SchoolClass(id={self.id}, name='{self.name}')"
+
+
+class Matter(Base):
+    """
+    Subject matter model.
+    
+    A subject matter (e.g., History, Geography, Maths) that can be taught
+    by one or more teachers.
+    """
+    __tablename__ = "matters"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    
+    # Relationships
+    teachers: Mapped[list["Teacher"]] = relationship(
+        secondary=teacher_matter_association,
+        back_populates="matters"
+    )
+    class_assignments: Mapped[list["ClassMatterAssignment"]] = relationship(
+        back_populates="matter"
+    )
+
+    def __repr__(self) -> str:
+        return f"Matter(id={self.id}, name='{self.name}')"
+
+
+class ClassMatterAssignment(Base):
+    """
+    Assignment of a specific teacher to teach a specific matter in a specific class.
+    
+    This enforces the rule that a class has a single teacher teaching each subject matter.
+    Also stores the hours per week for that matter in that class.
+    """
+    __tablename__ = "class_matter_assignments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"))
+    matter_id: Mapped[int] = mapped_column(ForeignKey("matters.id"))
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
+    hours_per_week: Mapped[int] = mapped_column()  # Fixed number of hours
+
+    # Relationships
+    school_class: Mapped["SchoolClass"] = relationship(back_populates="matter_assignments")
+    matter: Mapped["Matter"] = relationship(back_populates="class_assignments")
+    teacher: Mapped["Teacher"] = relationship(back_populates="class_assignments")
+
+    def __repr__(self) -> str:
+        return f"ClassMatterAssignment(class_id={self.class_id}, matter_id={self.matter_id}, teacher_id={self.teacher_id})"
