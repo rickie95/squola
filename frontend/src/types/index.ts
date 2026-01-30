@@ -114,3 +114,64 @@ export interface ClassMatterAssignmentUpdate {
   teacher_id?: number;
   hours_per_week?: number;
 }
+
+// ============ Scheduling Types ============
+
+export interface ScheduleSlot {
+  day: string;
+  hour: string;
+  teacher: string;
+  matter: string;
+  class?: string;
+}
+
+export interface ScheduleMetadata {
+  status: string;
+  solve_time_seconds: number;
+  generated_at: string;
+  total_slots: number;
+}
+
+export interface GeneratedSchedule {
+  metadata: ScheduleMetadata;
+  schedule: {
+    by_class: Record<string, ScheduleSlot[]>;
+    by_teacher: Record<string, ScheduleSlot[]>;
+    by_day: Record<string, ScheduleSlot[]>;
+  };
+}
+
+export interface GenerateScheduleRequest {
+  time_limit_seconds?: number;
+  save_to_file?: boolean;
+  output_path?: string;
+}
+
+export interface SchedulingPreviewTeacher {
+  id: number;
+  name: string;
+  hours_assigned: number;
+  blacklisted_slots: number;
+  preference: string;
+}
+
+export interface SchedulingPreviewClass {
+  id: number;
+  name: string;
+  assignments_count: number;
+  total_hours: number;
+}
+
+export interface SchedulingPreview {
+  summary: {
+    teachers_count: number;
+    classes_count: number;
+    assignments_count: number;
+    total_hours_to_schedule: number;
+    total_slots_available: number;
+    blacklisted_slots_count: number;
+  };
+  teachers: SchedulingPreviewTeacher[];
+  classes: SchedulingPreviewClass[];
+  issues: string[];
+}

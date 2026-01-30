@@ -17,6 +17,9 @@ import type {
   ClassMatterAssignment,
   ClassMatterAssignmentCreate,
   ClassMatterAssignmentUpdate,
+  GeneratedSchedule,
+  GenerateScheduleRequest,
+  SchedulingPreview,
 } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
@@ -170,6 +173,20 @@ export const classesApi = {
 
   deleteAssignment: async (classId: number, assignmentId: number): Promise<void> => {
     await api.delete(`/classes/${classId}/assignments/${assignmentId}`);
+  },
+};
+
+// ============ Scheduling API ============
+
+export const schedulingApi = {
+  preview: async (): Promise<SchedulingPreview> => {
+    const response = await api.get<SchedulingPreview>("/scheduling/preview");
+    return response.data;
+  },
+
+  generate: async (request: GenerateScheduleRequest = {}): Promise<GeneratedSchedule> => {
+    const response = await api.post<GeneratedSchedule>("/scheduling/generate", request);
+    return response.data;
   },
 };
 
