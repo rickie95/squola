@@ -20,14 +20,15 @@ from squola.models import (
     Teacher,
     TeacherBlacklistedSlot,
     SchedulePreference,
+    SavedSchedule,
 )
 
 
 # Schedule constants
 DAYS_OF_WEEK = 5  # Monday to Friday (0-4)
-HOURS_PER_DAY = 5  # 8:00 to 13:00 (slots 1-5)
+HOURS_PER_DAY = 6  # 8:00 to 14:00 (slots 1-6)
 DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-HOUR_LABELS = ["08:00-09:00", "09:00-10:00", "10:00-11:00", "11:00-12:00", "12:00-13:00"]
+HOUR_LABELS = ["08:00-09:00", "09:00-10:00", "10:00-11:00", "11:00-12:00", "12:00-13:00", "13:00-14:00"]
 
 
 @dataclass
@@ -52,7 +53,7 @@ class SchedulingData:
 class ScheduleSlot:
     """Represents a single scheduled slot in the timetable."""
     day: int  # 0-4 (Monday-Friday)
-    hour: int  # 1-5 (hour slots)
+    hour: int  # 1-6 (hour slots)
     class_id: int
     class_name: str
     teacher_id: int
@@ -468,16 +469,23 @@ class ScheduleGenerator:
         return slots
 
 
-def generate_schedule(db: Session, time_limit_seconds: float = 60.0) -> GeneratedSchedule:
+def generate_schedule(
+    db: Session,
+    time_limit_seconds: float = 60.0,
+    save_to_db: bool = True,
+    nickname: str | None = None,
+) -> GeneratedSchedule:
     """
     Main entry point for schedule generation.
     
     Fetches data from the database, builds the constraint model,
-    solves it, and returns the generated schedule.
+    solves it, and optionally saves the result to the database.
     
     Args:
         db: SQLAlchemy database session
         time_limit_seconds: Maximum solving time
+        save_to_db: Whether to save the schedule to the database
+        nickname: Optional user-friendly name for the schedule
         
     Returns:
         GeneratedSchedule containing the solution
@@ -494,4 +502,49 @@ def generate_schedule(db: Session, time_limit_seconds: float = 60.0) -> Generate
     generator = ScheduleGenerator(data)
     generator.build_model()
     
-    return generator.solve(time_limit_seconds)
+    schedule = generator.solve(time_limit_seconds)
+    
+    # Save to database if requested and successful
+    if save_to_db and schedule.status in ("OPTIMAL", "FEASIBLE"):
+        save_schedule_to_db(db, schedule, nickname)
+    
+    return schedule
+
+
+def save_schedule_to_db(
+    db: Session,
+    schedule: GeneratedSchedule,
+    nickname: str | None = None,
+) -> SavedSchedule:
+    """
+    Save a generated schedule to the database.
+    
+    Args:
+        db: SQLAlchemy database session
+        schedule: The generated schedule to save
+        nickname: Optional user-friendly name
+        
+    Returns:
+        The saved schedule model instance
+    """
+    # Generate name from timestamp
+    name = datetime.now().strftime("Schedule %Y-%m-%d %H:%M:%S")
+    
+    # Get schedule data as JSON string (only the schedule part, not metadata)
+    schedule_dict = schedule.to_dict()
+    schedule_data_json = json.dumps(schedule_dict["schedule"])
+    
+    saved_schedule = SavedSchedule(
+        name=name,
+        nickname=nickname,
+        status=schedule.status,
+        solve_time_seconds=schedule.solve_time_seconds,
+        total_slots=len(schedule.slots),
+        schedule_data=schedule_data_json,
+    )
+    
+    db.add(saved_schedule)
+    db.commit()
+    db.refresh(saved_schedule)
+    
+    return saved_schedule

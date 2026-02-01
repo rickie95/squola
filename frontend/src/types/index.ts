@@ -143,6 +143,7 @@ export interface GeneratedSchedule {
 
 export interface GenerateScheduleRequest {
   time_limit_seconds?: number;
+  nickname?: string;
   save_to_file?: boolean;
   output_path?: string;
 }
@@ -174,4 +175,28 @@ export interface SchedulingPreview {
   teachers: SchedulingPreviewTeacher[];
   classes: SchedulingPreviewClass[];
   issues: string[];
+}
+
+// ============ Saved Schedule Types ============
+
+export interface SavedScheduleListItem {
+  id: number;
+  name: string;
+  nickname: string | null;
+  status: string;
+  solve_time_seconds: number;
+  total_slots: number;
+  created_at: string;
+}
+
+export interface SavedSchedule extends SavedScheduleListItem {
+  schedule_data: {
+    by_class: Record<string, ScheduleSlot[]>;
+    by_teacher: Record<string, ScheduleSlot[]>;
+    by_day: Record<string, ScheduleSlot[]>;
+  };
+}
+
+export interface SavedScheduleUpdate {
+  nickname?: string;
 }

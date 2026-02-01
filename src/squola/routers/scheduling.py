@@ -1,5 +1,6 @@
 """API router for schedule generation endpoints."""
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +10,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from squola.database import get_db
+from squola.models import SavedSchedule
 from squola.scheduler import generate_schedule, GeneratedSchedule
+from squola.schemas import (
+    SavedScheduleListResponse,
+    SavedScheduleResponse,
+    SavedScheduleUpdate,
+)
 
 
 router = APIRouter(prefix="/scheduling", tags=["scheduling"])
@@ -22,6 +29,11 @@ class GenerateScheduleRequest(BaseModel):
         ge=1.0,
         le=600.0,
         description="Maximum time in seconds to spend solving the schedule"
+    )
+    nickname: str | None = Field(
+        default=None,
+        max_length=255,
+        description="User-friendly name for the schedule"
     )
     save_to_file: bool = Field(
         default=False,
@@ -81,7 +93,12 @@ def generate_schedule_endpoint(
     
     Returns the schedule grouped by class, by teacher, and by day.
     """
-    schedule = generate_schedule(db, request.time_limit_seconds)
+    schedule = generate_schedule(
+        db,
+        time_limit_seconds=request.time_limit_seconds,
+        save_to_db=True,
+        nickname=request.nickname,
+    )
     
     if schedule.status == "NO_DATA":
         raise HTTPException(
@@ -203,3 +220,106 @@ def preview_scheduling_data(db: Session = Depends(get_db)) -> dict[str, Any]:
         ],
         "issues": issues,
     }
+
+
+# ============ Saved Schedules CRUD ============
+
+@router.get("/schedules", response_model=list[SavedScheduleListResponse])
+def list_saved_schedules(db: Session = Depends(get_db)) -> list[SavedScheduleListResponse]:
+    """
+    List all saved schedules.
+    
+    Returns schedules ordered by creation date (newest first).
+    Does not include the full schedule data to keep response size small.
+    """
+    schedules = (
+        db.query(SavedSchedule)
+        .order_by(SavedSchedule.created_at.desc())
+        .all()
+    )
+    
+    return [
+        SavedScheduleListResponse(
+            id=s.id,
+            name=s.name,
+            nickname=s.nickname,
+            status=s.status,
+            solve_time_seconds=s.solve_time_seconds,
+            total_slots=s.total_slots,
+            created_at=s.created_at.isoformat(),
+        )
+        for s in schedules
+    ]
+
+
+@router.get("/schedules/{schedule_id}", response_model=SavedScheduleResponse)
+def get_saved_schedule(
+    schedule_id: int,
+    db: Session = Depends(get_db),
+) -> SavedScheduleResponse:
+    """
+    Get a specific saved schedule including its full data.
+    """
+    schedule = db.query(SavedSchedule).filter(SavedSchedule.id == schedule_id).first()
+    
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    return SavedScheduleResponse(
+        id=schedule.id,
+        name=schedule.name,
+        nickname=schedule.nickname,
+        status=schedule.status,
+        solve_time_seconds=schedule.solve_time_seconds,
+        total_slots=schedule.total_slots,
+        created_at=schedule.created_at.isoformat(),
+        schedule_data=json.loads(schedule.schedule_data),
+    )
+
+
+@router.patch("/schedules/{schedule_id}", response_model=SavedScheduleListResponse)
+def update_saved_schedule(
+    schedule_id: int,
+    data: SavedScheduleUpdate,
+    db: Session = Depends(get_db),
+) -> SavedScheduleListResponse:
+    """
+    Update a saved schedule's nickname.
+    """
+    schedule = db.query(SavedSchedule).filter(SavedSchedule.id == schedule_id).first()
+    
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    if data.nickname is not None:
+        schedule.nickname = data.nickname
+    
+    db.commit()
+    db.refresh(schedule)
+    
+    return SavedScheduleListResponse(
+        id=schedule.id,
+        name=schedule.name,
+        nickname=schedule.nickname,
+        status=schedule.status,
+        solve_time_seconds=schedule.solve_time_seconds,
+        total_slots=schedule.total_slots,
+        created_at=schedule.created_at.isoformat(),
+    )
+
+
+@router.delete("/schedules/{schedule_id}", status_code=204)
+def delete_saved_schedule(
+    schedule_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    """
+    Delete a saved schedule.
+    """
+    schedule = db.query(SavedSchedule).filter(SavedSchedule.id == schedule_id).first()
+    
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    db.delete(schedule)
+    db.commit()

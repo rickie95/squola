@@ -269,6 +269,7 @@ export default function ClassesPage() {
         <div className="card">
           <div className="card-header">
             <h3>{selectedClass ? `Class ${selectedClass.name} - Subjects` : "Select a Class"}</h3>
+            {selectedClass ? (<h4> {selectedClass.matter_assignments.reduce((accu, assignment) => accu + assignment.hours_per_week, 0)}/30 hours </h4>) : null}
             {selectedClass && (
               <button className="btn btn-primary btn-sm" onClick={openAssignmentModal}>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" width="16" height="16">

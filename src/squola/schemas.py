@@ -167,5 +167,46 @@ class SchoolClassWithAssignmentsResponse(SchoolClassResponse):
     model_config = {"from_attributes": True}
 
 
+# ============ Saved Schedule Schemas ============
+
+class SavedScheduleBase(BaseModel):
+    """Base schema for saved schedules."""
+    nickname: str | None = Field(None, max_length=255, description="User-friendly name for the schedule")
+
+
+class SavedScheduleCreate(SavedScheduleBase):
+    """Schema for creating a saved schedule (internal use)."""
+    name: str
+    status: str
+    solve_time_seconds: float
+    total_slots: int
+    schedule_data: str  # JSON string
+
+
+class SavedScheduleUpdate(BaseModel):
+    """Schema for updating a saved schedule."""
+    nickname: str | None = Field(None, max_length=255)
+
+
+class SavedScheduleListResponse(BaseModel):
+    """Schema for saved schedule in list view (without full data)."""
+    id: int
+    name: str
+    nickname: str | None
+    status: str
+    solve_time_seconds: float
+    total_slots: int
+    created_at: str  # ISO format
+
+    model_config = {"from_attributes": True}
+
+
+class SavedScheduleResponse(SavedScheduleListResponse):
+    """Schema for full saved schedule response including data."""
+    schedule_data: dict  # Parsed JSON
+
+    model_config = {"from_attributes": True}
+
+
 # Rebuild models to resolve forward references
 MatterWithTeachersResponse.model_rebuild()

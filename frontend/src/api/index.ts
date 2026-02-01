@@ -20,6 +20,9 @@ import type {
   GeneratedSchedule,
   GenerateScheduleRequest,
   SchedulingPreview,
+  SavedScheduleListItem,
+  SavedSchedule,
+  SavedScheduleUpdate,
 } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
@@ -187,6 +190,26 @@ export const schedulingApi = {
   generate: async (request: GenerateScheduleRequest = {}): Promise<GeneratedSchedule> => {
     const response = await api.post<GeneratedSchedule>("/scheduling/generate", request);
     return response.data;
+  },
+
+  // Saved schedules
+  listSaved: async (): Promise<SavedScheduleListItem[]> => {
+    const response = await api.get<SavedScheduleListItem[]>("/scheduling/schedules");
+    return response.data;
+  },
+
+  getSaved: async (id: number): Promise<SavedSchedule> => {
+    const response = await api.get<SavedSchedule>(`/scheduling/schedules/${id}`);
+    return response.data;
+  },
+
+  updateSaved: async (id: number, data: SavedScheduleUpdate): Promise<SavedScheduleListItem> => {
+    const response = await api.patch<SavedScheduleListItem>(`/scheduling/schedules/${id}`, data);
+    return response.data;
+  },
+
+  deleteSaved: async (id: number): Promise<void> => {
+    await api.delete(`/scheduling/schedules/${id}`);
   },
 };
 

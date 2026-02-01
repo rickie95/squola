@@ -1,9 +1,10 @@
 """SQLAlchemy database models for Squola scheduling app."""
 
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String, Table, Column, Integer
+from sqlalchemy import ForeignKey, String, Table, Column, Integer, Text, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -162,3 +163,27 @@ class ClassMatterAssignment(Base):
 
     def __repr__(self) -> str:
         return f"ClassMatterAssignment(class_id={self.class_id}, matter_id={self.matter_id}, teacher_id={self.teacher_id})"
+
+
+class SavedSchedule(Base):
+    """
+    A saved/generated schedule.
+    
+    Stores the full schedule data as JSON along with metadata about
+    when it was generated and its status.
+    """
+    __tablename__ = "saved_schedules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))  # Auto-generated from datetime
+    nickname: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # User-friendly name
+    status: Mapped[str] = mapped_column(String(50))  # OPTIMAL, FEASIBLE, etc.
+    solve_time_seconds: Mapped[float] = mapped_column()
+    total_slots: Mapped[int] = mapped_column()
+    schedule_data: Mapped[str] = mapped_column(Text)  # JSON data
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow
+    )
+
+    def __repr__(self) -> str:
+        return f"SavedSchedule(id={self.id}, name='{self.name}', status='{self.status}')"
