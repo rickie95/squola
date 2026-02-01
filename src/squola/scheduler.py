@@ -237,7 +237,7 @@ class ScheduleGenerator:
             for day in range(DAYS_OF_WEEK):
                 for hour in range(1, HOURS_PER_DAY + 1):
                     var_name = f"x_a{assignment.id}_d{day}_h{hour}"
-                    self.x[(assignment.id, day, hour)] = self.model.NewBoolVar(var_name)
+                    self.x[(assignment.id, day, hour)] = self.model.new_bool_var(var_name)
     
     def _add_hours_per_week_constraint(self) -> None:
         """
@@ -251,7 +251,7 @@ class ScheduleGenerator:
                 for day in range(DAYS_OF_WEEK)
                 for hour in range(1, HOURS_PER_DAY + 1)
             ]
-            self.model.Add(sum(hours_vars) == assignment.hours_per_week)
+            self.model.add(sum(hours_vars) == assignment.hours_per_week)
     
     def _add_teacher_no_overlap_constraint(self) -> None:
         """
@@ -259,7 +259,7 @@ class ScheduleGenerator:
         
         From spec: "a teacher cannot work in two classes in the same schedule slot"
         """
-        for teacher_id, assignments in self.assignments_by_teacher.items():
+        for _, assignments in self.assignments_by_teacher.items():
             if len(assignments) <= 1:
                 continue
             
@@ -270,7 +270,7 @@ class ScheduleGenerator:
                         self.x[(assignment.id, day, hour)]
                         for assignment in assignments
                     ]
-                    self.model.Add(sum(slot_vars) <= 1)
+                    self.model.add(sum(slot_vars) <= 1)
     
     def _add_class_no_overlap_constraint(self) -> None:
         """
@@ -289,7 +289,7 @@ class ScheduleGenerator:
                         self.x[(assignment.id, day, hour)]
                         for assignment in assignments
                     ]
-                    self.model.Add(sum(slot_vars) <= 1)
+                    self.model.add(sum(slot_vars) <= 1)
     
     def _add_teacher_blacklist_constraint(self) -> None:
         """
@@ -303,20 +303,40 @@ class ScheduleGenerator:
             
             for assignment in self.assignments_by_teacher[teacher_id]:
                 # Force this slot to be 0 (not scheduled)
-                self.model.Add(self.x[(assignment.id, day, hour)] == 0)
+                self.model.add(self.x[(assignment.id, day, hour)] == 0)
     
     def _add_max_hours_per_day_constraint(self, max_hours: int = HOURS_PER_DAY) -> None:
         """
         Soft constraint: Limit hours per day for teachers to avoid overload.
         """
-        for teacher_id, assignments in self.assignments_by_teacher.items():
+        for _, assignments in self.assignments_by_teacher.items():
             for day in range(DAYS_OF_WEEK):
                 day_hours = [
                     self.x[(assignment.id, day, hour)]
                     for assignment in assignments
                     for hour in range(1, HOURS_PER_DAY + 1)
                 ]
-                self.model.Add(sum(day_hours) <= max_hours)
+                self.model.add(sum(day_hours) <= max_hours)
+
+    def _add_at_least_twice_per_week_constraint(self) -> None:
+        for assignment_id in self.at_least_twice_per_week_assignments:
+            for day in range(DAYS_OF_WEEK):
+                day_vars = [
+                    self.x[(assignment_id, day, hour)]
+                    for hour in range(1, HOURS_PER_DAY + 1)
+                ]
+                self.model.add(sum(day_vars) <= 1)
+
+    def _add_at_most_three_hours_per_single_lesson_constraint(self) -> None:
+        for assignment in self.data.assignments:
+            for day in range(DAYS_OF_WEEK):
+                for start_hour in range(1, HOURS_PER_DAY - 3 + 1):
+                    block_vars = [
+                        self.x[(assignment.id, day, hour)]
+                        # the block of 4 consecutive hours is needed to exclude possibility of 4-hour lessons
+                        for hour in range(start_hour, start_hour + 4)
+                    ]
+                    self.model.add(sum(block_vars) <= 3)
     
     def _add_preference_objectives(self) -> None:
         """
@@ -361,7 +381,7 @@ class ScheduleGenerator:
                 self._add_maximize_gaps_for_teacher(teacher.id, assignments, objective_terms)
         
         if objective_terms:
-            self.model.Minimize(sum(objective_terms))
+            self.model.minimize(sum(objective_terms))
     
     def _add_minimize_gaps_for_teacher(
         self,
