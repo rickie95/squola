@@ -269,6 +269,9 @@ def update_class_assignment(
     
     if assignment_data.hours_per_week is not None:
         assignment.hours_per_week = assignment_data.hours_per_week
+
+    if assignment_data.requirements is not None:
+        assignment.requirements = assignment_data.requirements
     
     db.commit()
     db.refresh(assignment)

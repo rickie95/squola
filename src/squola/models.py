@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String, Table, Column, Integer, Text, DateTime
+from sqlalchemy import JSON, ForeignKey, String, Table, Column, Integer, Text, DateTime, TypeDecorator
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -21,6 +21,11 @@ class SchedulePreference(str, Enum):
     MAXIMIZE_GAPS = "maximize_gaps"  # More free time between lessons
     NONE = "none"  # No preference
 
+class MatterRequirements(str, Enum):
+    """Special requirements for subject matters."""
+    AT_LEAST_TWICE_PER_WEEK = "at_least_twice_per_week"
+    ONE_LESSON_OF_THREE_HOURS_PER_WEEK = "one_lesson_of_three_hours_per_week"
+    ONE_LESSON_OF_TWO_HOURS_PER_WEEK = "one_lesson_of_two_hours_per_week"
 
 # Association table for teacher-matter relationship (many-to-many)
 teacher_matter_association = Table(
@@ -79,7 +84,7 @@ class TeacherBlacklistedSlot(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
-    day_of_week: Mapped[int] = mapped_column()  # 0=Monday, 4=Friday
+    day_of_week: Mapped[int] = mapped_column() 
     hour_slot: Mapped[int] = mapped_column()  # 1-based hour slot
 
     teacher: Mapped["Teacher"] = relationship(back_populates="blacklisted_slots")
@@ -140,6 +145,27 @@ class Matter(Base):
     def __repr__(self) -> str:
         return f"Matter(id={self.id}, name='{self.name}')"
 
+class EnumArray(TypeDecorator):
+    """
+    Serializza/Deserializza una lista di Enum in una colonna JSON di SQLite.
+    """
+    impl = JSON
+
+    def __init__(self, enum_class, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.enum_class = enum_class
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        # Converte la lista di Enum in una lista di stringhe (i valori dell'enum)
+        return [e.value if isinstance(e, Enum) else e for e in value]
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        # Riconverte la lista di stringhe in oggetti Enum
+        return [self.enum_class(v) for v in value]
 
 class ClassMatterAssignment(Base):
     """
@@ -155,6 +181,7 @@ class ClassMatterAssignment(Base):
     matter_id: Mapped[int] = mapped_column(ForeignKey("matters.id"))
     teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
     hours_per_week: Mapped[int] = mapped_column()  # Fixed number of hours
+    requirements: Mapped[list[MatterRequirements]] = mapped_column(EnumArray(MatterRequirements), nullable=True)
 
     # Relationships
     school_class: Mapped["SchoolClass"] = relationship(back_populates="matter_assignments")

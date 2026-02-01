@@ -3,6 +3,8 @@
 from enum import Enum
 from pydantic import BaseModel, EmailStr, Field
 
+from squola.models import MatterRequirements
+
 
 class SchedulePreference(str, Enum):
     """Teacher scheduling preferences."""
@@ -137,6 +139,7 @@ class ClassMatterAssignmentBase(BaseModel):
     matter_id: int
     teacher_id: int
     hours_per_week: int = Field(..., ge=1, description="Fixed number of hours per week")
+    requirements: list[MatterRequirements] = Field(default_factory=list)
 
 
 class ClassMatterAssignmentCreate(ClassMatterAssignmentBase):
@@ -148,7 +151,7 @@ class ClassMatterAssignmentUpdate(BaseModel):
     """Schema for updating an assignment."""
     teacher_id: int | None = None
     hours_per_week: int | None = Field(None, ge=1)
-
+    requirements: list[MatterRequirements] | None = None
 
 class ClassMatterAssignmentResponse(ClassMatterAssignmentBase):
     """Schema for assignment response."""
