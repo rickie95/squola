@@ -1,18 +1,36 @@
-// ============ Enums ============
+// ============ Enums (as const objects for erasableSyntaxOnly compatibility) ============
 
-export enum SchedulePreference {
-  EARLY = "early",
-  LATE = "late",
-  MINIMIZE_GAPS = "minimize_gaps",
-  MAXIMIZE_GAPS = "maximize_gaps",
-  NONE = "none",
-}
+export const SchedulePreference = {
+  EARLY: "early",
+  LATE: "late",
+  MINIMIZE_GAPS: "minimize_gaps",
+  MAXIMIZE_GAPS: "maximize_gaps",
+  NONE: "none",
+} as const;
+
+export type SchedulePreference = (typeof SchedulePreference)[keyof typeof SchedulePreference];
+
+export const MatterRequirement = {
+  AT_LEAST_TWICE_PER_WEEK: "at_least_twice_per_week",
+  ONE_LESSON_OF_THREE_HOURS_PER_WEEK: "one_lesson_of_three_hours_per_week",
+  ONE_LESSON_OF_TWO_HOURS_PER_WEEK: "one_lesson_of_two_hours_per_week",
+} as const;
+
+export type MatterRequirement = (typeof MatterRequirement)[keyof typeof MatterRequirement];
+
+// Human-readable labels for requirements
+export const REQUIREMENT_LABELS: Record<MatterRequirement, string> = {
+  [MatterRequirement.AT_LEAST_TWICE_PER_WEEK]: "At least twice per week",
+  [MatterRequirement.ONE_LESSON_OF_THREE_HOURS_PER_WEEK]: "One lesson of 3 hours/week",
+  [MatterRequirement.ONE_LESSON_OF_TWO_HOURS_PER_WEEK]: "One lesson of 2 hours/week",
+};
 
 // ============ Matter Types ============
 
 export interface Matter {
   id: number;
   name: string;
+  default_requirements: MatterRequirement[];
 }
 
 export interface MatterWithTeachers extends Matter {
@@ -21,10 +39,12 @@ export interface MatterWithTeachers extends Matter {
 
 export interface MatterCreate {
   name: string;
+  default_requirements?: MatterRequirement[];
 }
 
 export interface MatterUpdate {
   name?: string;
+  default_requirements?: MatterRequirement[];
 }
 
 // ============ Blacklisted Slot Types ============
@@ -86,6 +106,7 @@ export interface ClassMatterAssignment {
   matter_id: number;
   teacher_id: number;
   hours_per_week: number;
+  requirements: MatterRequirement[];
   matter: Matter;
   teacher: Teacher;
 }
@@ -108,11 +129,13 @@ export interface ClassMatterAssignmentCreate {
   matter_id: number;
   teacher_id: number;
   hours_per_week: number;
+  requirements?: MatterRequirement[];
 }
 
 export interface ClassMatterAssignmentUpdate {
   teacher_id?: number;
   hours_per_week?: number;
+  requirements?: MatterRequirement[];
 }
 
 // ============ Scheduling Types ============

@@ -17,10 +17,12 @@ router = APIRouter(prefix="/matters", tags=["matters"])
 
 
 @router.get("", response_model=list[MatterResponse])
-def list_matters(db: Session = Depends(get_db)) -> list[Matter]:
+def list_matters(db: Session = Depends(get_db)) -> list[MatterResponse]:
     """List all subject matters."""
     stmt = select(Matter)
-    return list(db.scalars(stmt).all())
+    res: list[Matter] = list(db.scalars(stmt).all())
+    results = [MatterResponse(id=r.id, name=r.name, default_requirements=r.default_requirements) for r in res]
+    return results
 
 
 @router.get("/{matter_id}", response_model=MatterWithTeachersResponse)
@@ -52,7 +54,10 @@ def create_matter(matter_data: MatterCreate, db: Session = Depends(get_db)) -> M
             detail=f"Matter '{matter_data.name}' already exists"
         )
     
-    matter = Matter(name=matter_data.name)
+    matter = Matter(
+        name=matter_data.name,
+        default_requirements=matter_data.default_requirements or []
+    )
     db.add(matter)
     db.commit()
     db.refresh(matter)
@@ -87,6 +92,9 @@ def update_matter(
                 detail=f"Matter '{matter_data.name}' already exists"
             )
         matter.name = matter_data.name
+    
+    if matter_data.default_requirements is not None:
+        matter.default_requirements = matter_data.default_requirements
     
     db.commit()
     db.refresh(matter)

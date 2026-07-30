@@ -27,6 +27,30 @@ class MatterRequirements(str, Enum):
     ONE_LESSON_OF_THREE_HOURS_PER_WEEK = "one_lesson_of_three_hours_per_week"
     ONE_LESSON_OF_TWO_HOURS_PER_WEEK = "one_lesson_of_two_hours_per_week"
 
+
+class EnumArray(TypeDecorator):
+    """
+    Serialize/Deserialize a list of Enum values to/from a JSON column in SQLite.
+    """
+    impl = JSON
+
+    def __init__(self, enum_class, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.enum_class = enum_class
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        # Convert the list of Enum to a list of strings (enum values)
+        return [e.value if isinstance(e, Enum) else e for e in value]
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        # Convert the list of strings back to Enum objects
+        return [self.enum_class(v) for v in value]
+
+
 # Association table for teacher-matter relationship (many-to-many)
 teacher_matter_association = Table(
     "teacher_matter",
@@ -132,6 +156,9 @@ class Matter(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
+    default_requirements: Mapped[list[MatterRequirements]] = mapped_column(
+        EnumArray(MatterRequirements), nullable=True, default=list
+    )
     
     # Relationships
     teachers: Mapped[list["Teacher"]] = relationship(
@@ -145,27 +172,6 @@ class Matter(Base):
     def __repr__(self) -> str:
         return f"Matter(id={self.id}, name='{self.name}')"
 
-class EnumArray(TypeDecorator):
-    """
-    Serializza/Deserializza una lista di Enum in una colonna JSON di SQLite.
-    """
-    impl = JSON
-
-    def __init__(self, enum_class, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.enum_class = enum_class
-
-    def process_bind_param(self, value, dialect):
-        if value is None:
-            return None
-        # Converte la lista di Enum in una lista di stringhe (i valori dell'enum)
-        return [e.value if isinstance(e, Enum) else e for e in value]
-
-    def process_result_value(self, value, dialect):
-        if value is None:
-            return None
-        # Riconverte la lista di stringhe in oggetti Enum
-        return [self.enum_class(v) for v in value]
 
 class ClassMatterAssignment(Base):
     """

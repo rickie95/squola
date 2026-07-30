@@ -7,7 +7,9 @@ import type {
   SchoolClassCreate,
   ClassMatterAssignmentCreate,
   ClassMatterAssignment,
+  Matter,
 } from "../types";
+import { MatterRequirement, REQUIREMENT_LABELS } from "../types";
 import Modal from "../components/Modal";
 
 const ROMAN_NUMERALS = ["I", "II", "III", "IV", "V"];
@@ -27,7 +29,9 @@ export default function ClassesPage() {
     matter_id: 0,
     teacher_id: 0,
     hours_per_week: 1,
+    requirements: [],
   });
+  const [editingAssignment, setEditingAssignment] = useState<ClassMatterAssignment | null>(null);
 
   const { data: classes, isLoading: classesLoading } = useQuery({
     queryKey: ["classes"],
@@ -82,6 +86,17 @@ export default function ClassesPage() {
     },
   });
 
+  const updateAssignmentMutation = useMutation({
+    mutationFn: ({ classId, assignmentId, data }: { classId: number; assignmentId: number; data: ClassMatterAssignmentCreate }) =>
+      classesApi.updateAssignment(classId, assignmentId, data),
+    onSuccess: () => {
+      if (selectedClass) {
+        refetchSelectedClass(selectedClass.id);
+      }
+      closeAssignmentModal();
+    },
+  });
+
   const deleteAssignmentMutation = useMutation({
     mutationFn: ({ classId, assignmentId }: { classId: number; assignmentId: number }) =>
       classesApi.deleteAssignment(classId, assignmentId),
@@ -115,21 +130,37 @@ export default function ClassesPage() {
     setClassFormData({ year: "I", section: "A" });
   };
 
-  const openAssignmentModal = () => {
+  const openAssignmentModal = (matter?: Matter) => {
+    setEditingAssignment(null);
+    const defaultReqs = matter?.default_requirements || [];
     setAssignmentFormData({
-      matter_id: matters?.[0]?.id || 0,
+      matter_id: matter?.id || matters?.[0]?.id || 0,
       teacher_id: teachers?.[0]?.id || 0,
       hours_per_week: 1,
+      requirements: defaultReqs,
+    });
+    setIsAssignmentModalOpen(true);
+  };
+
+  const openEditAssignmentModal = (assignment: ClassMatterAssignment) => {
+    setEditingAssignment(assignment);
+    setAssignmentFormData({
+      matter_id: assignment.matter_id,
+      teacher_id: assignment.teacher_id,
+      hours_per_week: assignment.hours_per_week,
+      requirements: assignment.requirements || [],
     });
     setIsAssignmentModalOpen(true);
   };
 
   const closeAssignmentModal = () => {
     setIsAssignmentModalOpen(false);
+    setEditingAssignment(null);
     setAssignmentFormData({
       matter_id: 0,
       teacher_id: 0,
       hours_per_week: 1,
+      requirements: [],
     });
   };
 
@@ -150,11 +181,29 @@ export default function ClassesPage() {
   const handleAssignmentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedClass) {
-      createAssignmentMutation.mutate({
-        classId: selectedClass.id,
-        data: assignmentFormData,
-      });
+      if (editingAssignment) {
+        updateAssignmentMutation.mutate({
+          classId: selectedClass.id,
+          assignmentId: editingAssignment.id,
+          data: assignmentFormData,
+        });
+      } else {
+        createAssignmentMutation.mutate({
+          classId: selectedClass.id,
+          data: assignmentFormData,
+        });
+      }
     }
+  };
+
+  // When matter selection changes, load default requirements
+  const handleMatterChange = (matterId: number) => {
+    const matter = matters?.find((m) => m.id === matterId);
+    setAssignmentFormData({
+      ...assignmentFormData,
+      matter_id: matterId,
+      requirements: matter?.default_requirements || [],
+    });
   };
 
   const handleDeleteClass = (id: number) => {
@@ -271,7 +320,7 @@ export default function ClassesPage() {
             <h3>{selectedClass ? `Class ${selectedClass.name} - Subjects` : "Select a Class"}</h3>
             {selectedClass ? (<h4> {selectedClass.matter_assignments.reduce((accu, assignment) => accu + assignment.hours_per_week, 0)}/30 hours </h4>) : null}
             {selectedClass && (
-              <button className="btn btn-primary btn-sm" onClick={openAssignmentModal}>
+              <button className="btn btn-primary btn-sm" onClick={() => openAssignmentModal()}>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" width="16" height="16">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
@@ -291,13 +340,30 @@ export default function ClassesPage() {
                         {assignment.teacher.first_name} {assignment.teacher.last_name}
                       </span>
                       <span className="hours">{assignment.hours_per_week} hours/week</span>
+                      {assignment.requirements && assignment.requirements.length > 0 && (
+                        <div className="requirements-tags" style={{ marginTop: "0.25rem" }}>
+                          {assignment.requirements.map((req) => (
+                            <span key={req} className="requirement-tag requirement-tag-sm">
+                              {REQUIREMENT_LABELS[req]}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => handleDeleteAssignment(assignment)}
-                    >
-                      Remove
-                    </button>
+                    <div className="action-buttons">
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => openEditAssignmentModal(assignment)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => handleDeleteAssignment(assignment)}
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -375,35 +441,32 @@ export default function ClassesPage() {
       <Modal
         isOpen={isAssignmentModalOpen}
         onClose={closeAssignmentModal}
-        title={`Add Subject to ${selectedClass?.name}`}
+        title={editingAssignment ? `Edit ${editingAssignment.matter.name} Assignment` : `Add Subject to ${selectedClass?.name}`}
       >
         <form onSubmit={handleAssignmentSubmit}>
-          <div className="form-group">
-            <label htmlFor="matter">Subject</label>
-            {getAvailableMatters().length > 0 ? (
-              <select
-                id="matter"
-                value={assignmentFormData.matter_id}
-                onChange={(e) =>
-                  setAssignmentFormData({
-                    ...assignmentFormData,
-                    matter_id: Number(e.target.value),
-                  })
-                }
-              >
-                <option value={0}>Select a subject...</option>
-                {getAvailableMatters().map((matter) => (
-                  <option key={matter.id} value={matter.id}>
-                    {matter.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-                All available subjects have been assigned to this class.
-              </p>
-            )}
-          </div>
+          {!editingAssignment && (
+            <div className="form-group">
+              <label htmlFor="matter">Subject</label>
+              {getAvailableMatters().length > 0 ? (
+                <select
+                  id="matter"
+                  value={assignmentFormData.matter_id}
+                  onChange={(e) => handleMatterChange(Number(e.target.value))}
+                >
+                  <option value={0}>Select a subject...</option>
+                  {getAvailableMatters().map((matter) => (
+                    <option key={matter.id} value={matter.id}>
+                      {matter.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+                  All available subjects have been assigned to this class.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="form-group">
             <label htmlFor="teacher">Teacher</label>
@@ -449,6 +512,38 @@ export default function ClassesPage() {
             />
           </div>
 
+          <div className="form-group">
+            <label>Requirements</label>
+            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
+              Override the default requirements for this specific class assignment.
+            </p>
+            <div className="checkbox-group">
+              {Object.values(MatterRequirement).map((req) => (
+                <label key={req} className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={assignmentFormData.requirements?.includes(req) || false}
+                    onChange={(e) => {
+                      const currentReqs = assignmentFormData.requirements || [];
+                      if (e.target.checked) {
+                        setAssignmentFormData({
+                          ...assignmentFormData,
+                          requirements: [...currentReqs, req],
+                        });
+                      } else {
+                        setAssignmentFormData({
+                          ...assignmentFormData,
+                          requirements: currentReqs.filter((r) => r !== req),
+                        });
+                      }
+                    }}
+                  />
+                  {REQUIREMENT_LABELS[req]}
+                </label>
+              ))}
+            </div>
+          </div>
+
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={closeAssignmentModal}>
               Cancel
@@ -458,11 +553,12 @@ export default function ClassesPage() {
               className="btn btn-primary"
               disabled={
                 createAssignmentMutation.isPending ||
-                assignmentFormData.matter_id === 0 ||
+                updateAssignmentMutation.isPending ||
+                (!editingAssignment && assignmentFormData.matter_id === 0) ||
                 assignmentFormData.teacher_id === 0
               }
             >
-              Add Subject
+              {editingAssignment ? "Update" : "Add Subject"}
             </button>
           </div>
         </form>

@@ -21,6 +21,7 @@ from squola.models import (
     TeacherBlacklistedSlot,
     SchedulePreference,
     SavedSchedule,
+    MatterRequirements,
 )
 
 
@@ -230,6 +231,21 @@ class ScheduleGenerator:
         self.blacklisted: set[tuple[int, int, int]] = set()
         for slot in self.data.blacklisted_slots:
             self.blacklisted.add((slot.teacher_id, slot.day_of_week, slot.hour_slot))
+
+        # Build requirement-based assignment lookups
+        self.at_least_twice_per_week_assignments: set[int] = set()
+        self.lesson_of_three_hours_per_week_assignments: set[int] = set()
+        self.lesson_of_two_hours_per_week_assignments: set[int] = set()
+        
+        for assignment in self.data.assignments:
+            requirements = assignment.requirements or []
+            for req in requirements:
+                if req == MatterRequirements.AT_LEAST_TWICE_PER_WEEK:
+                    self.at_least_twice_per_week_assignments.add(assignment.id)
+                elif req == MatterRequirements.ONE_LESSON_OF_THREE_HOURS_PER_WEEK:
+                    self.lesson_of_three_hours_per_week_assignments.add(assignment.id)
+                elif req == MatterRequirements.ONE_LESSON_OF_TWO_HOURS_PER_WEEK:
+                    self.lesson_of_two_hours_per_week_assignments.add(assignment.id)
     
     def _create_variables(self) -> None:
         """Create decision variables for the CP model."""
@@ -319,6 +335,12 @@ class ScheduleGenerator:
                 self.model.add(sum(day_hours) <= max_hours)
 
     def _add_at_least_twice_per_week_constraint(self) -> None:
+        """
+        Constraint: Assignment must be split across at least 2 different days.
+        
+        This is achieved by limiting each day to at most (total_hours - 1) hours,
+        forcing the lessons to span multiple days.
+        """
         for assignment_id in self.at_least_twice_per_week_assignments:
             for day in range(DAYS_OF_WEEK):
                 day_vars = [
@@ -326,6 +348,74 @@ class ScheduleGenerator:
                     for hour in range(1, HOURS_PER_DAY + 1)
                 ]
                 self.model.add(sum(day_vars) <= 1)
+
+    def _add_at_least_one_lesson_of_three_hours_per_week_constraint(self) -> None:
+        """
+        Constraint: At least one lesson must be 3 consecutive hours in a week.
+        
+        For each assignment with this requirement, we create boolean variables
+        for each possible 3-hour block (day, start_hour), and require at least one
+        to be fully scheduled.
+        """
+        for assignment_id in self.lesson_of_three_hours_per_week_assignments:
+            # Create auxiliary variables for each possible 3-hour block
+            block_indicators = []
+            for day in range(DAYS_OF_WEEK):
+                # Possible start hours for a 3-hour block: 1, 2, 3, 4 (ending at 3, 4, 5, 6)
+                for start_hour in range(1, HOURS_PER_DAY - 2 + 1):
+                    # Create indicator variable: 1 if this 3-hour block is fully scheduled
+                    block_var = self.model.new_bool_var(
+                        f"block3_a{assignment_id}_d{day}_h{start_hour}"
+                    )
+                    block_indicators.append(block_var)
+                    
+                    # Get the 3 consecutive hour variables
+                    hour_vars = [
+                        self.x[(assignment_id, day, hour)]
+                        for hour in range(start_hour, start_hour + 3)
+                    ]
+                    
+                    # If block_var is 1, all 3 hours must be scheduled
+                    # block_var => (h1 AND h2 AND h3), equivalent to: block_var <= min(h1, h2, h3)
+                    # In CP-SAT: if block_var is true, each hour var must be true
+                    for hv in hour_vars:
+                        self.model.add(hv >= block_var)
+            
+            # At least one 3-hour block must exist
+            if block_indicators:
+                self.model.add(sum(block_indicators) >= 1)
+
+    def _add_at_least_one_lesson_of_two_hours_per_week_constraint(self) -> None:
+        """
+        Constraint: At least one lesson must be 2 consecutive hours in a week.
+        
+        Similar to the 3-hour constraint but for 2-hour blocks.
+        """
+        for assignment_id in self.lesson_of_two_hours_per_week_assignments:
+            # Create auxiliary variables for each possible 2-hour block
+            block_indicators = []
+            for day in range(DAYS_OF_WEEK):
+                # Possible start hours for a 2-hour block: 1, 2, 3, 4, 5 (ending at 2, 3, 4, 5, 6)
+                for start_hour in range(1, HOURS_PER_DAY):
+                    # Create indicator variable: 1 if this 2-hour block is fully scheduled
+                    block_var = self.model.new_bool_var(
+                        f"block2_a{assignment_id}_d{day}_h{start_hour}"
+                    )
+                    block_indicators.append(block_var)
+                    
+                    # Get the 2 consecutive hour variables
+                    hour_vars = [
+                        self.x[(assignment_id, day, hour)]
+                        for hour in range(start_hour, start_hour + 2)
+                    ]
+                    
+                    # If block_var is 1, both hours must be scheduled
+                    for hv in hour_vars:
+                        self.model.add(hv >= block_var)
+            
+            # At least one 2-hour block must exist
+            if block_indicators:
+                self.model.add(sum(block_indicators) >= 1)
 
     def _add_at_most_three_hours_per_single_lesson_constraint(self) -> None:
         for assignment in self.data.assignments:
@@ -429,6 +519,12 @@ class ScheduleGenerator:
         self._add_class_no_overlap_constraint()
         self._add_teacher_blacklist_constraint()
         self._add_max_hours_per_day_constraint()
+        self._add_at_most_three_hours_per_single_lesson_constraint()
+        
+        # Matter requirement constraints
+        self._add_at_least_twice_per_week_constraint()
+        self._add_at_least_one_lesson_of_three_hours_per_week_constraint()
+        self._add_at_least_one_lesson_of_two_hours_per_week_constraint()
         
         # Soft constraints (objectives)
         self._add_preference_objectives()

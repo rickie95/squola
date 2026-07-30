@@ -213,6 +213,7 @@ def create_class_assignment(
         matter_id=assignment_data.matter_id,
         teacher_id=assignment_data.teacher_id,
         hours_per_week=assignment_data.hours_per_week,
+        requirements=assignment_data.requirements
     )
     db.add(assignment)
     db.commit()
@@ -227,7 +228,9 @@ def create_class_assignment(
             selectinload(ClassMatterAssignment.teacher),
         )
     )
-    return db.scalars(stmt).first()
+
+    res = db.scalars(stmt).first()
+    return res
 
 
 @router.put("/{class_id}/assignments/{assignment_id}", response_model=ClassMatterAssignmentResponse)

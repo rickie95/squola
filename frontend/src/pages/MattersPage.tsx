@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mattersApi } from "../api";
 import type { Matter, MatterCreate } from "../types";
+import { MatterRequirement, REQUIREMENT_LABELS } from "../types";
 import Modal from "../components/Modal";
 
 export default function MattersPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMatter, setEditingMatter] = useState<Matter | null>(null);
-  const [formData, setFormData] = useState<MatterCreate>({ name: "" });
+  const [formData, setFormData] = useState<MatterCreate>({ name: "", default_requirements: [] });
 
   const { data: matters, isLoading } = useQuery({
     queryKey: ["matters"],
@@ -41,20 +42,20 @@ export default function MattersPage() {
 
   const openCreateModal = () => {
     setEditingMatter(null);
-    setFormData({ name: "" });
+    setFormData({ name: "", default_requirements: [] });
     setIsModalOpen(true);
   };
 
   const openEditModal = (matter: Matter) => {
     setEditingMatter(matter);
-    setFormData({ name: matter.name });
+    setFormData({ name: matter.name, default_requirements: matter.default_requirements || [] });
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingMatter(null);
-    setFormData({ name: "" });
+    setFormData({ name: "", default_requirements: [] });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -101,6 +102,7 @@ export default function MattersPage() {
                 <tr>
                   <th>ID</th>
                   <th>Name</th>
+                  <th>Default Requirements</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -109,6 +111,19 @@ export default function MattersPage() {
                   <tr key={matter.id}>
                     <td>{matter.id}</td>
                     <td>{matter.name}</td>
+                    <td>
+                      {matter.default_requirements && matter.default_requirements.length > 0 ? (
+                        <div className="requirements-tags">
+                          {matter.default_requirements.map((req) => (
+                            <span key={req} className="requirement-tag">
+                              {REQUIREMENT_LABELS[req]}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={{ color: "var(--text-secondary)" }}>None</span>
+                      )}
+                    </td>
                     <td>
                       <div className="action-buttons">
                         <button
@@ -156,6 +171,34 @@ export default function MattersPage() {
               placeholder="e.g., Mathematics, History, Science"
               required
             />
+          </div>
+          <div className="form-group">
+            <label>Default Requirements</label>
+            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
+              These requirements will be applied by default when assigning this matter to a class.
+            </p>
+            <div className="checkbox-group">
+              {Object.values(MatterRequirement).map((req) => (
+                <label key={req} className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={formData.default_requirements?.includes(req) || false}
+                    onChange={(e) => {
+                      const currentReqs = formData.default_requirements || [];
+                      if (e.target.checked) {
+                        setFormData({ ...formData, default_requirements: [...currentReqs, req] });
+                      } else {
+                        setFormData({
+                          ...formData,
+                          default_requirements: currentReqs.filter((r) => r !== req),
+                        });
+                      }
+                    }}
+                  />
+                  {REQUIREMENT_LABELS[req]}
+                </label>
+              ))}
+            </div>
           </div>
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={closeModal}>

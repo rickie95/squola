@@ -1,7 +1,7 @@
 """Pydantic schemas for API request/response validation."""
 
 from enum import Enum
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 from squola.models import MatterRequirements
 
@@ -40,6 +40,7 @@ class BlacklistedSlotResponse(BlacklistedSlotBase):
 class MatterBase(BaseModel):
     """Base schema for subject matters."""
     name: str = Field(..., min_length=1, max_length=100)
+    default_requirements: list[MatterRequirements] = Field(default_factory=list)
 
 
 class MatterCreate(MatterBase):
@@ -50,6 +51,7 @@ class MatterCreate(MatterBase):
 class MatterUpdate(BaseModel):
     """Schema for updating a matter."""
     name: str | None = Field(None, min_length=1, max_length=100)
+    default_requirements: list[MatterRequirements] | None = None
 
 
 class MatterResponse(MatterBase):
