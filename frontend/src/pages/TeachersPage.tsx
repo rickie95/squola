@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { teachersApi, mattersApi } from "../api";
 import type { Teacher, TeacherWithMatters, TeacherCreate, SchedulePreference } from "../types";
@@ -14,6 +15,7 @@ const SCHEDULE_PREFERENCES: { value: SchedulePreference; label: string }[] = [
 
 export default function TeachersPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<TeacherWithMatters | null>(null);
   const [formData, setFormData] = useState<TeacherCreate>({
@@ -170,6 +172,12 @@ export default function TeachersPage() {
                     </td>
                     <td>
                       <div className="action-buttons">
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => navigate(`/teachers/${teacher.id}`)}
+                        >
+                          View
+                        </button>
                         <button
                           className="btn btn-secondary btn-sm"
                           onClick={() => openEditModal(teacher)}

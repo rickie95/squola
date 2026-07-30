@@ -175,21 +175,21 @@ def preview_scheduling_data(db: Session = Depends(get_db)) -> dict[str, Any]:
                 f"but max possible is {max_teacher_hours}"
             )
     
-    # Check for blacklisted slots reducing availability
-    blacklist_counts: dict[int, int] = {}
-    for slot in data.blacklisted_slots:
-        blacklist_counts[slot.teacher_id] = blacklist_counts.get(slot.teacher_id, 0) + 1
-    
-    for teacher_id, blacklist_count in blacklist_counts.items():
+    # Check for unavailabilities reducing availability
+    unavail_counts: dict[int, int] = {}
+    for slot in data.unavailabilities:
+        unavail_counts[slot.teacher_id] = unavail_counts.get(slot.teacher_id, 0) + 1
+
+    for teacher_id, unavail_count in unavail_counts.items():
         hours = teacher_hours.get(teacher_id, 0)
-        available = max_teacher_hours - blacklist_count
+        available = max_teacher_hours - unavail_count
         if hours > available:
             teacher = next(t for t in data.teachers if t.id == teacher_id)
             issues.append(
                 f"Teacher {teacher.first_name} {teacher.last_name} needs {hours} hours "
-                f"but only has {available} slots available (after blacklist)"
+                f"but only has {available} slots available (after unavailabilities)"
             )
-    
+
     return {
         "summary": {
             "teachers_count": len(data.teachers),
@@ -197,14 +197,14 @@ def preview_scheduling_data(db: Session = Depends(get_db)) -> dict[str, Any]:
             "assignments_count": len(data.assignments),
             "total_hours_to_schedule": total_hours,
             "total_slots_available": total_slots_available,
-            "blacklisted_slots_count": len(data.blacklisted_slots),
+            "unavailabilities_count": len(data.unavailabilities),
         },
         "teachers": [
             {
                 "id": t.id,
                 "name": f"{t.first_name} {t.last_name}",
                 "hours_assigned": teacher_hours.get(t.id, 0),
-                "blacklisted_slots": blacklist_counts.get(t.id, 0),
+                "unavailabilities_count": unavail_counts.get(t.id, 0),
                 "preference": t.schedule_preference,
             }
             for t in data.teachers

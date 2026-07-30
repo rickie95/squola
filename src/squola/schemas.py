@@ -3,7 +3,7 @@
 from enum import Enum
 from pydantic import BaseModel, Field
 
-from squola.models import MatterRequirements
+from squola.models import MatterRequirements, TeacherUnavailability
 
 
 class SchedulePreference(str, Enum):
@@ -15,21 +15,21 @@ class SchedulePreference(str, Enum):
     NONE = "none"
 
 
-# ============ Blacklisted Slot Schemas ============
+# ============ Unavailability Schemas ============
 
-class BlacklistedSlotBase(BaseModel):
-    """Base schema for blacklisted time slots."""
+class UnavailabilityBase(BaseModel):
+    """Base schema for teacher unavailability slots."""
     day_of_week: int = Field(..., ge=0, le=4, description="Day of week (0=Monday, 4=Friday)")
     hour_slot: int = Field(..., ge=1, description="Hour slot (1-based)")
 
 
-class BlacklistedSlotCreate(BlacklistedSlotBase):
-    """Schema for creating a blacklisted slot."""
+class UnavailabilityCreate(UnavailabilityBase):
+    """Schema for creating an unavailability slot."""
     pass
 
 
-class BlacklistedSlotResponse(BlacklistedSlotBase):
-    """Schema for blacklisted slot response."""
+class UnavailabilityResponse(UnavailabilityBase):
+    """Schema for unavailability slot response."""
     id: int
 
     model_config = {"from_attributes": True}
@@ -102,7 +102,7 @@ class TeacherResponse(TeacherBase):
 class TeacherWithMattersResponse(TeacherResponse):
     """Schema for teacher response including matters."""
     matters: list[MatterResponse] = []
-    blacklisted_slots: list[BlacklistedSlotResponse] = []
+    unavailabilities: list[UnavailabilityResponse] = []
 
     model_config = {"from_attributes": True}
 

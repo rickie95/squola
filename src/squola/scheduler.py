@@ -18,7 +18,7 @@ from squola.models import (
     ClassMatterAssignment,
     SchoolClass,
     Teacher,
-    TeacherBlacklistedSlot,
+    TeacherUnavailability,
     SchedulePreference,
     SavedSchedule,
     MatterRequirements,
@@ -42,7 +42,7 @@ class SchedulingData:
     assignments: list[ClassMatterAssignment] = field(default_factory=list)
     
     # Constraints data
-    blacklisted_slots: list[TeacherBlacklistedSlot] = field(default_factory=list)
+    unavailabilities: list[TeacherUnavailability] = field(default_factory=list)
     
     # Index mappings for OR-Tools (entity -> index)
     teacher_index: dict[int, int] = field(default_factory=dict)
@@ -149,16 +149,16 @@ def fetch_scheduling_data(db: Session) -> SchedulingData:
     Fetch all necessary data from the database for scheduling.
     
     This includes:
-    - All teachers with their blacklisted slots
+    - All teachers with their unavailabilities
     - All classes
     - All class-matter-teacher assignments
     """
     data = SchedulingData()
     
-    # Fetch teachers with eager loading of blacklisted slots
+    # Fetch teachers with eager loading of unavailabilities
     data.teachers = list(
         db.query(Teacher)
-        .options(joinedload(Teacher.blacklisted_slots))
+        .options(joinedload(Teacher.unavailabilities))
         .all()
     )
     
@@ -176,8 +176,8 @@ def fetch_scheduling_data(db: Session) -> SchedulingData:
         .all()
     )
     
-    # Fetch all blacklisted slots
-    data.blacklisted_slots = list(db.query(TeacherBlacklistedSlot).all())
+    # Fetch all unavailability slots
+    data.unavailabilities = list(db.query(TeacherUnavailability).all())
     
     # Build index mappings
     for i, teacher in enumerate(data.teachers):
@@ -227,10 +227,10 @@ class ScheduleGenerator:
                 self.assignments_by_class[assignment.class_id] = []
             self.assignments_by_class[assignment.class_id].append(assignment)
         
-        # Blacklisted slots by teacher: (teacher_id, day, hour) -> True
-        self.blacklisted: set[tuple[int, int, int]] = set()
-        for slot in self.data.blacklisted_slots:
-            self.blacklisted.add((slot.teacher_id, slot.day_of_week, slot.hour_slot))
+        # Unavailable slots by teacher: (teacher_id, day, hour) -> True
+        self.unavailable: set[tuple[int, int, int]] = set()
+        for slot in self.data.unavailabilities:
+            self.unavailable.add((slot.teacher_id, slot.day_of_week, slot.hour_slot))
 
         # Build requirement-based assignment lookups
         self.at_least_twice_per_week_assignments: set[int] = set()
@@ -307,16 +307,16 @@ class ScheduleGenerator:
                     ]
                     self.model.add(sum(slot_vars) <= 1)
     
-    def _add_teacher_blacklist_constraint(self) -> None:
+    def _add_teacher_unavailability_constraint(self) -> None:
         """
-        Constraint: Teachers cannot be scheduled during their blacklisted slots.
-        
+        Constraint: Teachers cannot be scheduled during their unavailability slots.
+
         This handles teachers working at multiple schools.
         """
-        for (teacher_id, day, hour) in self.blacklisted:
+        for (teacher_id, day, hour) in self.unavailable:
             if teacher_id not in self.assignments_by_teacher:
                 continue
-            
+
             for assignment in self.assignments_by_teacher[teacher_id]:
                 # Force this slot to be 0 (not scheduled)
                 self.model.add(self.x[(assignment.id, day, hour)] == 0)
@@ -517,7 +517,7 @@ class ScheduleGenerator:
         self._add_hours_per_week_constraint()
         self._add_teacher_no_overlap_constraint()
         self._add_class_no_overlap_constraint()
-        self._add_teacher_blacklist_constraint()
+        self._add_teacher_unavailability_constraint()
         self._add_max_hours_per_day_constraint()
         self._add_at_most_three_hours_per_single_lesson_constraint()
         

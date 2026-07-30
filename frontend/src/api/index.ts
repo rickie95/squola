@@ -8,8 +8,8 @@ import type {
   TeacherWithMatters,
   TeacherCreate,
   TeacherUpdate,
-  BlacklistedSlot,
-  BlacklistedSlotCreate,
+  Unavailability,
+  UnavailabilityCreate,
   SchoolClass,
   SchoolClassWithAssignments,
   SchoolClassCreate,
@@ -89,30 +89,30 @@ export const teachersApi = {
     await api.delete(`/teachers/${id}`);
   },
 
-  // Blacklisted slots
-  listBlacklistedSlots: async (teacherId: number): Promise<BlacklistedSlot[]> => {
-    const response = await api.get<BlacklistedSlot[]>(
-      `/teachers/${teacherId}/blacklisted-slots`
+  // Unavailabilities
+  listUnavailabilities: async (teacherId: number): Promise<Unavailability[]> => {
+    const response = await api.get<Unavailability[]>(
+      `/teachers/${teacherId}/unavailabilities`
     );
     return response.data;
   },
 
-  addBlacklistedSlot: async (
+  addUnavailability: async (
     teacherId: number,
-    data: BlacklistedSlotCreate
-  ): Promise<BlacklistedSlot> => {
-    const response = await api.post<BlacklistedSlot>(
-      `/teachers/${teacherId}/blacklisted-slots`,
+    data: UnavailabilityCreate
+  ): Promise<Unavailability> => {
+    const response = await api.post<Unavailability>(
+      `/teachers/${teacherId}/unavailabilities`,
       data
     );
     return response.data;
   },
 
-  removeBlacklistedSlot: async (
+  removeUnavailability: async (
     teacherId: number,
     slotId: number
   ): Promise<void> => {
-    await api.delete(`/teachers/${teacherId}/blacklisted-slots/${slotId}`);
+    await api.delete(`/teachers/${teacherId}/unavailabilities/${slotId}`);
   },
 };
 

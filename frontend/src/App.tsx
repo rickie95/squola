@@ -5,6 +5,7 @@ import DashboardPage from "./pages/DashboardPage";
 import MattersPage from "./pages/MattersPage";
 import TeachersPage from "./pages/TeachersPage";
 import ClassesPage from "./pages/ClassesPage";
+import TeacherDetailPage from "./pages/TeacherDetailPage";
 import SchedulingPage from "./pages/SchedulingPage";
 
 const queryClient = new QueryClient({
@@ -25,6 +26,7 @@ function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/matters" element={<MattersPage />} />
             <Route path="/teachers" element={<TeachersPage />} />
+            <Route path="/teachers/:id" element={<TeacherDetailPage />} />
             <Route path="/classes" element={<ClassesPage />} />
             <Route path="/scheduling" element={<SchedulingPage />} />
           </Routes>

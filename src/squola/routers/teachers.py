@@ -5,14 +5,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from squola.database import get_db
-from squola.models import Teacher, Matter, TeacherBlacklistedSlot
+from squola.models import Teacher, Matter, TeacherUnavailability
 from squola.schemas import (
     TeacherCreate,
     TeacherUpdate,
     TeacherResponse,
     TeacherWithMattersResponse,
-    BlacklistedSlotCreate,
-    BlacklistedSlotResponse,
+    UnavailabilityCreate,
+    UnavailabilityResponse,
 )
 
 router = APIRouter(prefix="/teachers", tags=["teachers"])
@@ -33,7 +33,7 @@ def get_teacher(teacher_id: int, db: Session = Depends(get_db)) -> Teacher:
         .where(Teacher.id == teacher_id)
         .options(
             selectinload(Teacher.matters),
-            selectinload(Teacher.blacklisted_slots)
+            selectinload(Teacher.unavailabilities)
         )
     )
     teacher = db.scalars(stmt).first()
@@ -84,7 +84,7 @@ def update_teacher(
     stmt = (
         select(Teacher)
         .where(Teacher.id == teacher_id)
-        .options(selectinload(Teacher.matters), selectinload(Teacher.blacklisted_slots))
+        .options(selectinload(Teacher.matters), selectinload(Teacher.unavailabilities))
     )
     teacher = db.scalars(stmt).first()
     if not teacher:
@@ -139,12 +139,11 @@ def delete_teacher(teacher_id: int, db: Session = Depends(get_db)) -> None:
     db.commit()
 
 
-# ============ Blacklisted Slots Endpoints ============
+# ============ Unavailability Endpoints ============
 
-@router.get("/{teacher_id}/blacklisted-slots", response_model=list[BlacklistedSlotResponse])
-def list_blacklisted_slots(teacher_id: int, db: Session = Depends(get_db)) -> list[TeacherBlacklistedSlot]:
-    """List all blacklisted time slots for a teacher."""
-    # Verify teacher exists
+@router.get("/{teacher_id}/unavailabilities", response_model=list[UnavailabilityResponse])
+def list_unavailabilities(teacher_id: int, db: Session = Depends(get_db)) -> list[TeacherUnavailability]:
+    """List all unavailability slots for a teacher."""
     stmt = select(Teacher).where(Teacher.id == teacher_id)
     teacher = db.scalars(stmt).first()
     if not teacher:
@@ -152,23 +151,22 @@ def list_blacklisted_slots(teacher_id: int, db: Session = Depends(get_db)) -> li
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Teacher with id {teacher_id} not found"
         )
-    
-    stmt = select(TeacherBlacklistedSlot).where(TeacherBlacklistedSlot.teacher_id == teacher_id)
+
+    stmt = select(TeacherUnavailability).where(TeacherUnavailability.teacher_id == teacher_id)
     return list(db.scalars(stmt).all())
 
 
 @router.post(
-    "/{teacher_id}/blacklisted-slots",
-    response_model=BlacklistedSlotResponse,
+    "/{teacher_id}/unavailabilities",
+    response_model=UnavailabilityResponse,
     status_code=status.HTTP_201_CREATED
 )
-def add_blacklisted_slot(
+def add_unavailability(
     teacher_id: int,
-    slot_data: BlacklistedSlotCreate,
+    slot_data: UnavailabilityCreate,
     db: Session = Depends(get_db)
-) -> TeacherBlacklistedSlot:
-    """Add a blacklisted time slot for a teacher (e.g., hours at another school)."""
-    # Verify teacher exists
+) -> TeacherUnavailability:
+    """Add an unavailability slot for a teacher (e.g., hours at another school)."""
     stmt = select(Teacher).where(Teacher.id == teacher_id)
     teacher = db.scalars(stmt).first()
     if not teacher:
@@ -176,21 +174,19 @@ def add_blacklisted_slot(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Teacher with id {teacher_id} not found"
         )
-    
-    # Check if slot already exists
-    stmt = select(TeacherBlacklistedSlot).where(
-        TeacherBlacklistedSlot.teacher_id == teacher_id,
-        TeacherBlacklistedSlot.day_of_week == slot_data.day_of_week,
-        TeacherBlacklistedSlot.hour_slot == slot_data.hour_slot,
+
+    stmt = select(TeacherUnavailability).where(
+        TeacherUnavailability.teacher_id == teacher_id,
+        TeacherUnavailability.day_of_week == slot_data.day_of_week,
+        TeacherUnavailability.hour_slot == slot_data.hour_slot,
     )
-    existing = db.scalars(stmt).first()
-    if existing:
+    if db.scalars(stmt).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This time slot is already blacklisted for this teacher"
+            detail="This time slot is already marked as unavailable for this teacher"
         )
-    
-    slot = TeacherBlacklistedSlot(
+
+    slot = TeacherUnavailability(
         teacher_id=teacher_id,
         day_of_week=slot_data.day_of_week,
         hour_slot=slot_data.hour_slot,
@@ -201,18 +197,18 @@ def add_blacklisted_slot(
     return slot
 
 
-@router.delete("/{teacher_id}/blacklisted-slots/{slot_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_blacklisted_slot(teacher_id: int, slot_id: int, db: Session = Depends(get_db)) -> None:
-    """Remove a blacklisted time slot for a teacher."""
-    stmt = select(TeacherBlacklistedSlot).where(
-        TeacherBlacklistedSlot.id == slot_id,
-        TeacherBlacklistedSlot.teacher_id == teacher_id,
+@router.delete("/{teacher_id}/unavailabilities/{slot_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_unavailability(teacher_id: int, slot_id: int, db: Session = Depends(get_db)) -> None:
+    """Remove an unavailability slot for a teacher."""
+    stmt = select(TeacherUnavailability).where(
+        TeacherUnavailability.id == slot_id,
+        TeacherUnavailability.teacher_id == teacher_id,
     )
     slot = db.scalars(stmt).first()
     if not slot:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Blacklisted slot with id {slot_id} not found for teacher {teacher_id}"
+            detail=f"Unavailability slot with id {slot_id} not found for teacher {teacher_id}"
         )
     
     db.delete(slot)

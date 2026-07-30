@@ -10,7 +10,10 @@ I vincoli si dividono in due categorie:
 
 ### Insegnanti
 - Un insegnante non può essere in due classi nello stesso slot
-- Gli slot in cui un insegnante è occupato in un'altra scuola devono essere esclusi (**blacklist**)
+- Gli slot in cui un insegnante è indisponibile devono essere esclusi dal planning (vincolo **indisponibilità**)
+  - Le indisponibilità sono configurabili dalla scheda insegnante (`/teachers/:id`)
+  - È possibile bloccare singoli slot o un intero giorno (shortcut UI che aggiunge tutti e 6 gli slot del giorno)
+  - Modellate come record `TeacherUnavailability` (`day_of_week`, `hour_slot`) nella tabella `teacher_unavailabilities`
 
 ### Classi
 - In una classe può esserci un solo insegnante per slot

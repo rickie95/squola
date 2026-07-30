@@ -90,7 +90,7 @@ class Teacher(Base):
     class_assignments: Mapped[list["ClassMatterAssignment"]] = relationship(
         back_populates="teacher"
     )
-    blacklisted_slots: Mapped[list["TeacherBlacklistedSlot"]] = relationship(
+    unavailabilities: Mapped[list["TeacherUnavailability"]] = relationship(
         back_populates="teacher",
         cascade="all, delete-orphan"
     )
@@ -99,22 +99,22 @@ class Teacher(Base):
         return f"Teacher(id={self.id}, name='{self.first_name} {self.last_name}')"
 
 
-class TeacherBlacklistedSlot(Base):
+class TeacherUnavailability(Base):
     """
-    Represents time slots when a teacher is unavailable.
+    Represents time slots when a teacher is unavailable for scheduling.
     Useful for teachers working in multiple schools.
     """
-    __tablename__ = "teacher_blacklisted_slots"
+    __tablename__ = "teacher_unavailabilities"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
-    day_of_week: Mapped[int] = mapped_column() 
+    day_of_week: Mapped[int] = mapped_column()
     hour_slot: Mapped[int] = mapped_column()  # 1-based hour slot
 
-    teacher: Mapped["Teacher"] = relationship(back_populates="blacklisted_slots")
+    teacher: Mapped["Teacher"] = relationship(back_populates="unavailabilities")
 
     def __repr__(self) -> str:
-        return f"BlacklistedSlot(teacher_id={self.teacher_id}, day={self.day_of_week}, slot={self.hour_slot})"
+        return f"TeacherUnavailability(teacher_id={self.teacher_id}, day={self.day_of_week}, slot={self.hour_slot})"
 
 
 class SchoolClass(Base):

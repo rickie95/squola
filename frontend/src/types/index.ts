@@ -47,15 +47,15 @@ export interface MatterUpdate {
   default_requirements?: MatterRequirement[];
 }
 
-// ============ Blacklisted Slot Types ============
+// ============ Unavailability Types ============
 
-export interface BlacklistedSlot {
+export interface Unavailability {
   id: number;
   day_of_week: number; // 0=Monday, 4=Friday
   hour_slot: number; // 1-based
 }
 
-export interface BlacklistedSlotCreate {
+export interface UnavailabilityCreate {
   day_of_week: number;
   hour_slot: number;
 }
@@ -72,7 +72,7 @@ export interface Teacher {
 
 export interface TeacherWithMatters extends Teacher {
   matters: Matter[];
-  blacklisted_slots: BlacklistedSlot[];
+  unavailabilities: Unavailability[];
 }
 
 export interface TeacherCreate {
@@ -175,7 +175,7 @@ export interface SchedulingPreviewTeacher {
   id: number;
   name: string;
   hours_assigned: number;
-  blacklisted_slots: number;
+  unavailabilities_count: number;
   preference: string;
 }
 
@@ -193,7 +193,7 @@ export interface SchedulingPreview {
     assignments_count: number;
     total_hours_to_schedule: number;
     total_slots_available: number;
-    blacklisted_slots_count: number;
+    unavailabilities_count: number;
   };
   teachers: SchedulingPreviewTeacher[];
   classes: SchedulingPreviewClass[];

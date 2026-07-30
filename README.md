@@ -4,7 +4,7 @@ A single-user web app for generating school timetables. You feed it teachers, cl
 
 ## What it does
 
-The user inserts all the data (teachers with their unavailabilities and preferences, classes, subject matters with hours/week), and triggers a schedule generation. The solver finds a valid assignment of lessons to time slots respecting all constraints (no teacher in two places at once, blacklisted slots, subject requirements, scheduling preferences). Generated schedules are saved and can be browsed.
+The user inserts all the data (teachers with their unavailabilities and preferences, classes, subject matters with hours/week), and triggers a schedule generation. The solver finds a valid assignment of lessons to time slots respecting all constraints (no teacher in two places at once, teacher unavailabilities, subject requirements, scheduling preferences). Generated schedules are saved and can be browsed.
 
 ## Architecture
 
@@ -29,8 +29,9 @@ Full-stack single-user app:
 | Feature | Backend | Frontend |
 |---|---|---|
 | Gestione insegnanti (CRUD) | X | X |
-| Slot blacklistati per insegnante | X | X |
+| Indisponibilità insegnante (slot e giorni) | X | X |
 | Preferenze di scheduling insegnante | X | X |
+| Requisiti singole materie | X | X | 
 | Gestione materie (CRUD) | X | X |
 | Gestione classi (CRUD) | X | X |
 | Assegnazione materia/insegnante a classe | X | X |
@@ -39,6 +40,20 @@ Full-stack single-user app:
 | Salvataggio e browse orari generati | X | X |
 | Export PDF | | |
 | Ore pomeridiane per classi | | |
+
+---
+
+## Teacher unavailabilities
+
+A teacher can be marked as unavailable for specific time slots — e.g., hours they spend at another school. The CP-SAT solver hard-excludes those slots when generating the timetable.
+
+**Data model:** `TeacherUnavailability` (`teacher_unavailabilities` table) — one row per blocked slot with `day_of_week` (0–4) and `hour_slot` (1–6).
+
+**API:** `GET/POST /teachers/{id}/unavailabilities`, `DELETE /teachers/{id}/unavailabilities/{slot_id}` — see `src/squola/routers/teachers.py`.
+
+**UI:** `/teachers/:id` — teacher detail page with a 5×6 interactive grid. Click a cell to toggle a single slot; click a day header to block/unblock the entire day (sends one request per hour slot).
+
+**Solver:** `ScheduleGenerator._add_teacher_unavailability_constraint()` in `src/squola/scheduler.py` forces the corresponding CP-SAT variable to 0.
 
 ---
 
