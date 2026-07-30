@@ -20,19 +20,19 @@ export default function DashboardPage() {
 
   const stats = [
     {
-      label: "Subject Matters",
+      label: "Materie",
       value: matters?.length || 0,
       link: "/matters",
       color: "#4f46e5",
     },
     {
-      label: "Teachers",
+      label: "Insegnanti",
       value: teachers?.length || 0,
       link: "/teachers",
       color: "#0891b2",
     },
     {
-      label: "Classes",
+      label: "Classi",
       value: classes?.length || 0,
       link: "/classes",
       color: "#059669",
@@ -42,8 +42,8 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="page-header">
-        <h2>Dashboard</h2>
-        <p>Overview of your school scheduling data</p>
+        <h2>Home</h2>
+        <p>Panoramica dei dati della tua scuola</p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
@@ -67,7 +67,7 @@ export default function DashboardPage() {
 
       <div className="card">
         <div className="card-header">
-          <h3>Quick Start Guide</h3>
+          <h3>Guida Rapida</h3>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem" }}>
@@ -86,9 +86,9 @@ export default function DashboardPage() {
               1
             </div>
             <div>
-              <strong>Add Subject Matters</strong>
+              <strong>Aggiungi le materie</strong>
               <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
-                Start by adding the subjects taught in your school (e.g., Mathematics, History, Science).
+                Inizia aggiungendo le materie presenti nella tua scuola (e.g., Matematica, Storia, Scienze).
               </p>
             </div>
           </div>
@@ -108,9 +108,9 @@ export default function DashboardPage() {
               2
             </div>
             <div>
-              <strong>Add Teachers</strong>
+              <strong>Aggiungi gli Insegnanti</strong>
               <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
-                Add teachers to the roster and assign them the subjects they can teach.
+                Crea l'anagrafica insegnanti e associali alle materie.
               </p>
             </div>
           </div>
@@ -130,9 +130,9 @@ export default function DashboardPage() {
               3
             </div>
             <div>
-              <strong>Create Classes</strong>
+              <strong>Crea le Classi</strong>
               <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
-                Create school classes (e.g., IIIA, IIB) and assign subjects with their teachers and weekly hours.
+                Aggiungi le classi (e.g., IIIA, IIB) e assegna le materie con gli insegnanti e le ore settimanali previste.
               </p>
             </div>
           </div>
@@ -152,9 +152,9 @@ export default function DashboardPage() {
               4
             </div>
             <div>
-              <strong>Generate Schedule</strong>
+              <strong>Genera l'orario</strong>
               <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
-                Once all data is entered, use the Scheduling page to generate an optimized timetable.
+                Una volta inseriti tutti i dati, usa la sezione Orario per generare uno schema ottimizzato secondo i tuoi criteri.
               </p>
             </div>
           </div>

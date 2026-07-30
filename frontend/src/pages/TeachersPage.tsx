@@ -6,11 +6,11 @@ import type { Teacher, TeacherWithMatters, TeacherCreate, SchedulePreference } f
 import Modal from "../components/Modal";
 
 const SCHEDULE_PREFERENCES: { value: SchedulePreference; label: string }[] = [
-  { value: "none", label: "No preference" },
-  { value: "early", label: "Prefer early hours" },
-  { value: "late", label: "Prefer late hours" },
-  { value: "minimize_gaps", label: "Minimize gaps" },
-  { value: "maximize_gaps", label: "Maximize gaps" },
+  { value: "none", label: "Nessuna preferenza" },
+  { value: "early", label: "Preferisce le prime ore" },
+  { value: "late", label: "Preferisce le ultime ore" },
+  { value: "minimize_gaps", label: "Minimizza i buchi" },
+  { value: "maximize_gaps", label: "Massimizza i buchi" },
 ];
 
 export default function TeachersPage() {
@@ -112,7 +112,7 @@ export default function TeachersPage() {
   };
 
   const handleDelete = (id: number) => {
-    if (globalThis.confirm("Are you sure you want to remove this teacher from the roster?")) {
+    if (globalThis.confirm("Sei sicuro di voler rimuovere questo insegnante dall'elenco?")) {
       deleteMutation.mutate(id);
     }
   };
@@ -126,24 +126,24 @@ export default function TeachersPage() {
   };
 
   if (teachersLoading) {
-    return <div className="loading">Loading teachers...</div>;
+    return <div className="loading">Carico la lista insegnanti...</div>;
   }
 
   return (
     <div>
       <div className="page-header">
-        <h2>Teachers</h2>
-        <p>Manage your school's teaching roster</p>
+        <h2>Insegnanti</h2>
+        <p>Gestisci l'elenco dei docenti</p>
       </div>
 
       <div className="card">
         <div className="card-header">
-          <h3>All Teachers</h3>
+          <h3>Lista insegnanti</h3>
           <button className="btn btn-primary" onClick={openCreateModal}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" width="16" height="16">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-            Add Teacher
+            Aggiungi un insegnante
           </button>
         </div>
 
@@ -153,10 +153,10 @@ export default function TeachersPage() {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Name</th>
+                  <th>Nome</th>
                   <th>Email</th>
-                  <th>Preference</th>
-                  <th>Actions</th>
+                  <th>Preferenze</th>
+                  <th>Azioni</th>
                 </tr>
               </thead>
               <tbody>
@@ -176,19 +176,19 @@ export default function TeachersPage() {
                           className="btn btn-secondary btn-sm"
                           onClick={() => navigate(`/teachers/${teacher.id}`)}
                         >
-                          View
+                          Scheda
                         </button>
                         <button
                           className="btn btn-secondary btn-sm"
                           onClick={() => openEditModal(teacher)}
                         >
-                          Edit
+                          Modifica
                         </button>
                         <button
                           className="btn btn-danger btn-sm"
                           onClick={() => handleDelete(teacher.id)}
                         >
-                          Remove
+                          Cancella
                         </button>
                       </div>
                     </td>
@@ -202,7 +202,7 @@ export default function TeachersPage() {
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
             </svg>
-            <p>No teachers found. Add your first teacher!</p>
+            <p>Nessun isegnante presente, aggiungine uno!</p>
           </div>
         )}
       </div>
@@ -210,12 +210,12 @@ export default function TeachersPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={closeModal}
-        title={editingTeacher ? "Edit Teacher" : "Add New Teacher"}
+        title={editingTeacher ? "Modifica un insegnante" : "Aggiungi un insegnante"}
       >
         <form onSubmit={handleSubmit}>
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="first_name">First Name</label>
+              <label htmlFor="first_name">Nome</label>
               <input
                 type="text"
                 id="first_name"
@@ -225,7 +225,7 @@ export default function TeachersPage() {
               />
             </div>
             <div className="form-group">
-              <label htmlFor="last_name">Last Name</label>
+              <label htmlFor="last_name">Cognome</label>
               <input
                 type="text"
                 id="last_name"
@@ -237,7 +237,7 @@ export default function TeachersPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="email">Email (optional)</label>
+            <label htmlFor="email">Email (opzionale)</label>
             <input
               type="email"
               id="email"
@@ -247,7 +247,7 @@ export default function TeachersPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="schedule_preference">Schedule Preference</label>
+            <label htmlFor="schedule_preference">Preferenze d'orario</label>
             <select
               id="schedule_preference"
               value={formData.schedule_preference}
@@ -262,7 +262,7 @@ export default function TeachersPage() {
           </div>
 
           <div className="form-group">
-            <label>Subjects Taught</label>
+            <label>Materie insegnate</label>
             {matters && matters.length > 0 ? (
               <div className="checkbox-list">
                 {matters.map((matter) => (
@@ -278,21 +278,21 @@ export default function TeachersPage() {
               </div>
             ) : (
               <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-                No matters available. Add matters first.
+                Nessuna materia. Aggiungine una con il bottone in alto.
               </p>
             )}
           </div>
 
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={closeModal}>
-              Cancel
+              Annulla
             </button>
             <button
               type="submit"
               className="btn btn-primary"
               disabled={createMutation.isPending || updateMutation.isPending}
             >
-              {editingTeacher ? "Update" : "Create"}
+              {editingTeacher ? "Aggiorna" : "Crea"}
             </button>
           </div>
         </form>

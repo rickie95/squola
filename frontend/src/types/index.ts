@@ -20,9 +20,9 @@ export type MatterRequirement = (typeof MatterRequirement)[keyof typeof MatterRe
 
 // Human-readable labels for requirements
 export const REQUIREMENT_LABELS: Record<MatterRequirement, string> = {
-  [MatterRequirement.AT_LEAST_TWICE_PER_WEEK]: "At least twice per week",
-  [MatterRequirement.ONE_LESSON_OF_THREE_HOURS_PER_WEEK]: "One lesson of 3 hours/week",
-  [MatterRequirement.ONE_LESSON_OF_TWO_HOURS_PER_WEEK]: "One lesson of 2 hours/week",
+  [MatterRequirement.AT_LEAST_TWICE_PER_WEEK]: "Almeno due volte a settimana",
+  [MatterRequirement.ONE_LESSON_OF_THREE_HOURS_PER_WEEK]: "Almeno una lezione da 3 ore",
+  [MatterRequirement.ONE_LESSON_OF_TWO_HOURS_PER_WEEK]: "Almeno una lezione da 2 ore",
 };
 
 // ============ Matter Types ============

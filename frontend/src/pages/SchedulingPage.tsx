@@ -11,7 +11,7 @@ import type {
 type ViewMode = "by_class" | "by_teacher" | "by_day";
 type TabMode = "generate" | "history";
 
-const DAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const DAY_ORDER = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì"];
 const HOUR_ORDER = [
   "08:00-09:00",
   "09:00-10:00",
@@ -74,7 +74,7 @@ export default function SchedulingPage() {
       setNickname("");
       fetchSavedSchedules(); // Refresh the list
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to generate schedule");
+      setError(err.response?.data?.detail || "Errore durante la generazione dell'orario");
     } finally {
       setGenerating(false);
     }
@@ -85,12 +85,12 @@ export default function SchedulingPage() {
       const data = await schedulingApi.getSaved(id);
       setSelectedSavedSchedule(data);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to load schedule");
+      setError(err.response?.data?.detail || "Errore durante il caricamento dell'orario");
     }
   };
 
   const handleDeleteSchedule = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this schedule?")) return;
+    if (!confirm("Sei sicuro di voler cancellare questo orario?")) return;
     try {
       await schedulingApi.deleteSaved(id);
       fetchSavedSchedules();
@@ -98,7 +98,7 @@ export default function SchedulingPage() {
         setSelectedSavedSchedule(null);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to delete schedule");
+      setError(err.response?.data?.detail || "Errore durante la cancellazione dell'orario");
     }
   };
 
@@ -146,7 +146,7 @@ export default function SchedulingPage() {
     return (
       <div className="card" style={{ marginBottom: "1.5rem" }}>
         <div className="card-header">
-          <h3>Scheduling Preview</h3>
+          <h3>Anteprima orario</h3>
         </div>
 
         <div
@@ -159,29 +159,29 @@ export default function SchedulingPage() {
         >
           <div className="stat-card">
             <div className="stat-value">{preview.summary.teachers_count}</div>
-            <div className="stat-label">Teachers</div>
+            <div className="stat-label">Insegnanti</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">{preview.summary.classes_count}</div>
-            <div className="stat-label">Classes</div>
+            <div className="stat-label">Classi</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">
               {preview.summary.assignments_count}
             </div>
-            <div className="stat-label">Assignments</div>
+            <div className="stat-label">Materie</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">
               {preview.summary.total_hours_to_schedule}
             </div>
-            <div className="stat-label">Hours to Schedule</div>
+            <div className="stat-label">Ore da programmare</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">
               {preview.summary.total_slots_available}
             </div>
-            <div className="stat-label">Slots Available</div>
+            <div className="stat-label">Slot disponibili</div>
           </div>
         </div>
 
@@ -196,7 +196,7 @@ export default function SchedulingPage() {
             }}
           >
             <h4 style={{ color: "#dc2626", marginBottom: "0.5rem" }}>
-              ⚠️ Potential Issues
+              ⚠️ Potenziali problemi
             </h4>
             <ul style={{ margin: 0, paddingLeft: "1.5rem" }}>
               {preview.issues.map((issue) => (
@@ -210,7 +210,7 @@ export default function SchedulingPage() {
 
         <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", flexWrap: "wrap" }}>
           <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: "150px" }}>
-            <label htmlFor="timeLimit">Time Limit (seconds)</label>
+            <label htmlFor="timeLimit">Tempo max per il calcolo</label>
             <input
               type="number"
               id="timeLimit"
@@ -221,13 +221,13 @@ export default function SchedulingPage() {
             />
           </div>
           <div className="form-group" style={{ marginBottom: 0, flex: 2, minWidth: "200px" }}>
-            <label htmlFor="nickname">Nickname (optional)</label>
+            <label htmlFor="nickname">Nome (optional)</label>
             <input
               type="text"
               id="nickname"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
-              placeholder="e.g., Spring 2026 Draft"
+              placeholder="e.g., Orario provvisorio settembre"
             />
           </div>
           <button
@@ -239,10 +239,10 @@ export default function SchedulingPage() {
           >
             {generating ? (
               <>
-                <span className="spinner"></span> Generating...
+                <span className="spinner"></span> Sto calcolando...
               </>
             ) : (
-              "Generate Schedule"
+              "Genera Orario"
             )}
           </button>
         </div>
@@ -254,24 +254,24 @@ export default function SchedulingPage() {
     return (
       <div className="card" style={{ marginBottom: "1.5rem" }}>
         <div className="card-header">
-          <h3>Saved Schedules</h3>
+          <h3>Orari salvati</h3>
         </div>
 
         {savedSchedules.length === 0 ? (
           <div className="empty-state">
-            <p>No saved schedules yet. Generate one to get started!</p>
+            <p>Nessun orario salvato al momento.</p>
           </div>
         ) : (
           <div className="table-container">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Name</th>
+                  <th>Nome</th>
                   <th>Nickname</th>
-                  <th>Status</th>
-                  <th>Slots</th>
-                  <th>Created</th>
-                  <th>Actions</th>
+                  <th>Stato</th>
+                  <th>Slot</th>
+                  <th>Creato il</th>
+                  <th>Azioni</th>
                 </tr>
               </thead>
               <tbody>
@@ -285,7 +285,7 @@ export default function SchedulingPage() {
                             type="text"
                             value={newNickname}
                             onChange={(e) => setNewNickname(e.target.value)}
-                            placeholder="Enter nickname"
+                            placeholder="Inserisci il nickname"
                             style={{ width: "120px" }}
                           />
                           <button
@@ -293,14 +293,14 @@ export default function SchedulingPage() {
                             style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}
                             onClick={() => handleUpdateNickname(s.id)}
                           >
-                            Save
+                            Salva
                           </button>
                           <button
                             className="btn btn-secondary"
                             style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}
                             onClick={() => setEditingNickname(null)}
                           >
-                            Cancel
+                            Annulla
                           </button>
                         </div>
                       ) : (
@@ -317,9 +317,9 @@ export default function SchedulingPage() {
                             setEditingNickname(s.id);
                             setNewNickname(s.nickname || "");
                           }}
-                          title="Click to edit"
+                          title="Clicca per modificare"
                         >
-                          {s.nickname || "Add nickname"}
+                          {s.nickname || "Aggiungi nickname"}
                         </button>
                       )}
                     </td>
@@ -339,14 +339,14 @@ export default function SchedulingPage() {
                           style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}
                           onClick={() => handleLoadSavedSchedule(s.id)}
                         >
-                          View
+                          Visualizza
                         </button>
                         <button
                           className="btn btn-danger"
                           style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}
                           onClick={() => handleDeleteSchedule(s.id)}
                         >
-                          Delete
+                          Cancella
                         </button>
                       </div>
                     </td>
@@ -388,18 +388,18 @@ export default function SchedulingPage() {
             >
               Status: <strong>{selectedSavedSchedule.status}</strong> |{" "}
               {selectedSavedSchedule.total_slots} slots |{" "}
-              Created: {new Date(selectedSavedSchedule.created_at).toLocaleString()}
+              Creato il: {new Date(selectedSavedSchedule.created_at).toLocaleString()}
             </p>
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <button className="btn btn-secondary" onClick={downloadSchedule}>
-              Download JSON
+              Scarica JSON
             </button>
             <button
               className="btn btn-secondary"
               onClick={() => setSelectedSavedSchedule(null)}
             >
-              Close
+              Chiudi
             </button>
           </div>
         </div>
@@ -410,19 +410,19 @@ export default function SchedulingPage() {
               className={`btn ${viewMode === "by_class" ? "btn-primary" : "btn-secondary"}`}
               onClick={() => setViewMode("by_class")}
             >
-              By Class
+              Per Classe
             </button>
             <button
               className={`btn ${viewMode === "by_teacher" ? "btn-primary" : "btn-secondary"}`}
               onClick={() => setViewMode("by_teacher")}
             >
-              By Teacher
+              Per insegnante
             </button>
             <button
               className={`btn ${viewMode === "by_day" ? "btn-primary" : "btn-secondary"}`}
               onClick={() => setViewMode("by_day")}
             >
-              By Day
+              Per giorno
             </button>
           </div>
         </div>
@@ -446,10 +446,10 @@ export default function SchedulingPage() {
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Hour</th>
-                        <th>Class</th>
-                        <th>Teacher</th>
-                        <th>Subject</th>
+                        <th>Ora</th>
+                        <th>Classe</th>
+                        <th>Insegnante</th>
+                        <th>Materia</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -471,7 +471,7 @@ export default function SchedulingPage() {
                 </div>
               ) : (
                 <p style={{ color: "var(--text-secondary)", fontStyle: "italic" }}>
-                  No classes scheduled
+                  Nessuna classe prevista
                 </p>
               )}
             </div>
@@ -491,11 +491,11 @@ export default function SchedulingPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Day</th>
-                    <th>Hour</th>
-                    {viewMode === "by_class" && <th>Teacher</th>}
-                    {viewMode === "by_teacher" && <th>Class</th>}
-                    <th>Subject</th>
+                    <th>Giorno</th>
+                    <th>Ora</th>
+                    {viewMode === "by_class" && <th>Insegnante</th>}
+                    {viewMode === "by_teacher" && <th>Classe</th>}
+                    <th>Materie</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -539,7 +539,7 @@ export default function SchedulingPage() {
           }}
         >
           <div>
-            <h3>Generated Schedule</h3>
+            <h3>Genera Orario</h3>
             <p
               style={{
                 fontSize: "0.875rem",
@@ -547,13 +547,13 @@ export default function SchedulingPage() {
                 marginTop: "0.25rem",
               }}
             >
-              Status: <strong>{schedule.metadata.status}</strong> | Solved in{" "}
+              Status: <strong>{schedule.metadata.status}</strong> | Calcolato in{" "}
               {schedule.metadata.solve_time_seconds.toFixed(3)}s |{" "}
               {schedule.metadata.total_slots} slots
             </p>
           </div>
           <button className="btn btn-secondary" onClick={downloadSchedule}>
-            Download JSON
+            Scarica JSON
           </button>
         </div>
 
@@ -565,19 +565,19 @@ export default function SchedulingPage() {
               className={`btn ${viewMode === "by_class" ? "btn-primary" : "btn-secondary"}`}
               onClick={() => setViewMode("by_class")}
             >
-              By Class
+              Per Classe
             </button>
             <button
               className={`btn ${viewMode === "by_teacher" ? "btn-primary" : "btn-secondary"}`}
               onClick={() => setViewMode("by_teacher")}
             >
-              By Teacher
+              Per Insegnante
             </button>
             <button
               className={`btn ${viewMode === "by_day" ? "btn-primary" : "btn-secondary"}`}
               onClick={() => setViewMode("by_day")}
             >
-              By Day
+              Per Giorno
             </button>
           </div>
         </div>
@@ -590,8 +590,8 @@ export default function SchedulingPage() {
   return (
     <div>
       <div className="page-header">
-        <h2>Scheduling</h2>
-        <p>Generate and manage school schedules</p>
+        <h2>Orario</h2>
+        <p>Genera e gestisci gli orari</p>
       </div>
 
       {error && (
@@ -615,20 +615,20 @@ export default function SchedulingPage() {
           className={`btn ${tabMode === "generate" ? "btn-primary" : "btn-secondary"}`}
           onClick={() => setTabMode("generate")}
         >
-          Generate New
+          Calcola un nuovo orario
         </button>
         <button
           className={`btn ${tabMode === "history" ? "btn-primary" : "btn-secondary"}`}
           onClick={() => setTabMode("history")}
         >
-          Saved Schedules ({savedSchedules.length})
+          Orari salvati ({savedSchedules.length})
         </button>
       </div>
 
       {loading ? (
         <div className="card">
           <div className="loading-state">
-            <span className="spinner"></span> Loading scheduling data...
+            <span className="spinner"></span> Carico gli orari salvati...
           </div>
         </div>
       ) : (

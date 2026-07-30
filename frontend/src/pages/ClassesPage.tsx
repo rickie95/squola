@@ -229,26 +229,26 @@ export default function ClassesPage() {
   };
 
   if (classesLoading) {
-    return <div className="loading">Loading classes...</div>;
+    return <div className="loading">Carico le classi...</div>;
   }
 
   return (
     <div>
       <div className="page-header">
         <h2>Classes</h2>
-        <p>Manage school classes and their subject assignments</p>
+        <p>Gestisci le classi e gli assegnamenti delle materie</p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
         {/* Classes List */}
         <div className="card">
           <div className="card-header">
-            <h3>All Classes</h3>
+            <h3>Tutte le classi</h3>
             <button className="btn btn-primary" onClick={openCreateClassModal}>
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" width="16" height="16">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
-              Add Class
+             Nuova Classe
             </button>
           </div>
 
@@ -257,8 +257,8 @@ export default function ClassesPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>Class</th>
-                    <th>Actions</th>
+                    <th>Classi</th>
+                    <th>Azioni</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -286,7 +286,7 @@ export default function ClassesPage() {
                               openEditClassModal(schoolClass);
                             }}
                           >
-                            Edit
+                            Modifica
                           </button>
                           <button
                             className="btn btn-danger btn-sm"
@@ -295,7 +295,7 @@ export default function ClassesPage() {
                               handleDeleteClass(schoolClass.id);
                             }}
                           >
-                            Delete
+                            Cancella
                           </button>
                         </div>
                       </td>
@@ -324,7 +324,7 @@ export default function ClassesPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" width="16" height="16">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
-                Add Subject
+                Aggiungi materia
               </button>
             )}
           </div>
@@ -355,13 +355,13 @@ export default function ClassesPage() {
                         className="btn btn-secondary btn-sm"
                         onClick={() => openEditAssignmentModal(assignment)}
                       >
-                        Edit
+                        Modifica
                       </button>
                       <button
                         className="btn btn-danger btn-sm"
                         onClick={() => handleDeleteAssignment(assignment)}
                       >
-                        Remove
+                        Rimuovi
                       </button>
                     </div>
                   </div>
@@ -369,12 +369,12 @@ export default function ClassesPage() {
               </div>
             ) : (
               <div className="empty-state">
-                <p>No subjects assigned to this class yet.</p>
+                <p>Nessuna materia associate al momento.</p>
               </div>
             )
           ) : (
             <div className="empty-state">
-              <p>Select a class to view and manage its subjects.</p>
+              <p>Seleziona una classe per gestire le materie</p>
             </div>
           )}
         </div>
@@ -384,12 +384,12 @@ export default function ClassesPage() {
       <Modal
         isOpen={isClassModalOpen}
         onClose={closeClassModal}
-        title={editingClass ? "Edit Class" : "Add New Class"}
+        title={editingClass ? "Modifica classe" : "Aggiungi una nuova classe"}
       >
         <form onSubmit={handleClassSubmit}>
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="year">Year</label>
+              <label htmlFor="year">Anno</label>
               <select
                 id="year"
                 value={classFormData.year}
@@ -403,7 +403,7 @@ export default function ClassesPage() {
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="section">Section</label>
+              <label htmlFor="section">Sezione</label>
               <select
                 id="section"
                 value={classFormData.section}
@@ -419,19 +419,19 @@ export default function ClassesPage() {
           </div>
           <div style={{ marginTop: "1rem", padding: "1rem", backgroundColor: "var(--background-color)", borderRadius: "0.5rem" }}>
             <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-              Class name will be: <strong>{classFormData.year}{classFormData.section}</strong>
+              Il nome della classe sarà: <strong>{classFormData.year}{classFormData.section}</strong>
             </p>
           </div>
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={closeClassModal}>
-              Cancel
+              Annulla
             </button>
             <button
               type="submit"
               className="btn btn-primary"
               disabled={createClassMutation.isPending || updateClassMutation.isPending}
             >
-              {editingClass ? "Update" : "Create"}
+              {editingClass ? "Aggiorna" : "Crea"}
             </button>
           </div>
         </form>
@@ -441,19 +441,19 @@ export default function ClassesPage() {
       <Modal
         isOpen={isAssignmentModalOpen}
         onClose={closeAssignmentModal}
-        title={editingAssignment ? `Edit ${editingAssignment.matter.name} Assignment` : `Add Subject to ${selectedClass?.name}`}
+        title={editingAssignment ? `Modifica la materia ${editingAssignment.matter.name}` : `Aggiungi materia a ${selectedClass?.name}`}
       >
         <form onSubmit={handleAssignmentSubmit}>
           {!editingAssignment && (
             <div className="form-group">
-              <label htmlFor="matter">Subject</label>
+              <label htmlFor="matter">Materia</label>
               {getAvailableMatters().length > 0 ? (
                 <select
                   id="matter"
                   value={assignmentFormData.matter_id}
                   onChange={(e) => handleMatterChange(Number(e.target.value))}
                 >
-                  <option value={0}>Select a subject...</option>
+                  <option value={0}>Seleziona una materia...</option>
                   {getAvailableMatters().map((matter) => (
                     <option key={matter.id} value={matter.id}>
                       {matter.name}
@@ -462,14 +462,14 @@ export default function ClassesPage() {
                 </select>
               ) : (
                 <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-                  All available subjects have been assigned to this class.
+                  Tutte le materie disponibili sono state associate a questa classe.
                 </p>
               )}
             </div>
           )}
 
           <div className="form-group">
-            <label htmlFor="teacher">Teacher</label>
+            <label htmlFor="teacher">Insegnanti</label>
             {teachers && teachers.length > 0 ? (
               <select
                 id="teacher"
@@ -481,7 +481,7 @@ export default function ClassesPage() {
                   })
                 }
               >
-                <option value={0}>Select a teacher...</option>
+                <option value={0}>Seleziona un insegnante...</option>
                 {teachers.map((teacher) => (
                   <option key={teacher.id} value={teacher.id}>
                     {teacher.first_name} {teacher.last_name}
@@ -490,13 +490,13 @@ export default function ClassesPage() {
               </select>
             ) : (
               <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-                No teachers available. Add teachers first.
+                Nessun insegnante disponibile, aggiungine uno.
               </p>
             )}
           </div>
 
           <div className="form-group">
-            <label htmlFor="hours">Hours per Week</label>
+            <label htmlFor="hours">Ore settimanali</label>
             <input
               type="number"
               id="hours"
@@ -513,9 +513,9 @@ export default function ClassesPage() {
           </div>
 
           <div className="form-group">
-            <label>Requirements</label>
+            <label>Requisiti</label>
             <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
-              Override the default requirements for this specific class assignment.
+              Puoi aggiungere requisiti aggiuntivi, oltre a quelli già previsti dall'insegnamento.
             </p>
             <div className="checkbox-group">
               {Object.values(MatterRequirement).map((req) => (
@@ -546,7 +546,7 @@ export default function ClassesPage() {
 
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={closeAssignmentModal}>
-              Cancel
+              Annulla
             </button>
             <button
               type="submit"
@@ -558,7 +558,7 @@ export default function ClassesPage() {
                 assignmentFormData.teacher_id === 0
               }
             >
-              {editingAssignment ? "Update" : "Add Subject"}
+              {editingAssignment ? "Aggionra" : "Aggiungi materia"}
             </button>
           </div>
         </form>

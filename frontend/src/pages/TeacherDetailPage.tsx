@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { teachersApi } from "../api";
 import type { Unavailability } from "../types";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const DAYS = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì"];
 const HOURS = [
   "08:00–09:00",
   "09:00–10:00",
@@ -42,8 +42,8 @@ export default function TeacherDetailPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["teacher", teacherId] }),
   });
 
-  if (isLoading) return <div className="loading">Loading teacher...</div>;
-  if (!teacher) return <div className="empty-state"><p>Teacher not found.</p></div>;
+  if (isLoading) return <div className="loading">Carico la scheda insegnante...</div>;
+  if (!teacher) return <div className="empty-state"><p>Insegnante non trovato.</p></div>;
 
   const unavailable = buildUnavailableSet(teacher.unavailabilities);
 
@@ -93,24 +93,24 @@ export default function TeacherDetailPage() {
             onClick={() => navigate("/teachers")}
             style={{ marginBottom: "0.5rem" }}
           >
-            ← Back to Teachers
+            ← Torna all'elenco insegnanti
           </button>
           <h2>
             {teacher.first_name} {teacher.last_name}
           </h2>
-          <p>{teacher.email || "No email"}</p>
+          <p>{teacher.email || "Email non presente"}</p>
         </div>
       </div>
 
       {/* Teacher info */}
       <div className="card" style={{ marginBottom: "1.5rem" }}>
         <div className="card-header">
-          <h3>Details</h3>
+          <h3>Dettagli</h3>
         </div>
         <div style={{ padding: "1rem", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
           <div>
             <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              Schedule preference
+              Preferenze
             </span>
             <div style={{ marginTop: "0.25rem" }}>
               <span className="badge">{teacher.schedule_preference}</span>
@@ -118,7 +118,7 @@ export default function TeacherDetailPage() {
           </div>
           <div>
             <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              Subjects
+              Materie
             </span>
             <div className="badge-list" style={{ marginTop: "0.25rem" }}>
               {teacher.matters.length > 0
@@ -136,14 +136,14 @@ export default function TeacherDetailPage() {
       {/* Unavailability grid */}
       <div className="card">
         <div className="card-header">
-          <h3>Unavailabilities</h3>
+          <h3>Indisponibilità</h3>
           <span style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>
-            {teacher.unavailabilities.length} / {DAYS.length * HOURS_PER_DAY} slots blocked
+            {teacher.unavailabilities.length} / {DAYS.length * HOURS_PER_DAY} slot bloccati
           </span>
         </div>
         <div style={{ padding: "1rem", overflowX: "auto" }}>
           <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
-            Click a slot to mark it as unavailable. Click a day header to block/unblock the entire day.
+           Clicca su uno slot per renderlo non disponibile. Clicca sul giorno per bloccare/sbloccare tutto il giorno.
           </p>
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
             <thead>
@@ -156,7 +156,7 @@ export default function TeacherDetailPage() {
                       <button
                         onClick={() => toggleDay(dayIdx)}
                         disabled={isMutating}
-                        title={full ? "Click to unblock entire day" : "Click to block entire day"}
+                        title={full ? "Clicca per sbloccare tutto il giorno" : "Clicca per sbloccare tutto il giorno"}
                         style={dayHeaderBtnStyle(full)}
                       >
                         {day}
@@ -183,7 +183,7 @@ export default function TeacherDetailPage() {
                           <button
                             onClick={() => toggleSlot(dayIdx, hour)}
                             disabled={isMutating}
-                            title={blocked ? "Click to restore availability" : "Click to mark unavailable"}
+                            title={blocked ? "Clicca per ripristinare la disponibilità" : "Clicca per renderlo non disponibile"}
                             style={slotBtnStyle(blocked)}
                           />
                         </td>

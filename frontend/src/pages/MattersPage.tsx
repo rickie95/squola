@@ -74,24 +74,24 @@ export default function MattersPage() {
   };
 
   if (isLoading) {
-    return <div className="loading">Loading matters...</div>;
+    return <div className="loading">Carico le materie...</div>;
   }
 
   return (
     <div>
       <div className="page-header">
-        <h2>Subject Matters</h2>
-        <p>Manage the subjects taught in your school</p>
+        <h2>Materie</h2>
+        <p>Gestisci le materie insegnate nella scuola</p>
       </div>
 
       <div className="card">
         <div className="card-header">
-          <h3>All Matters</h3>
+          <h3>Tutte le materie</h3>
           <button className="btn btn-primary" onClick={openCreateModal}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" width="16" height="16">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-            Add Matter
+            Aggiungi una materia
           </button>
         </div>
 
@@ -101,9 +101,9 @@ export default function MattersPage() {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Name</th>
-                  <th>Default Requirements</th>
-                  <th>Actions</th>
+                  <th>Nome</th>
+                  <th>Requisiti di default</th>
+                  <th>Azioni</th>
                 </tr>
               </thead>
               <tbody>
@@ -121,7 +121,7 @@ export default function MattersPage() {
                           ))}
                         </div>
                       ) : (
-                        <span style={{ color: "var(--text-secondary)" }}>None</span>
+                        <span style={{ color: "var(--text-secondary)" }}>Nessuno</span>
                       )}
                     </td>
                     <td>
@@ -130,13 +130,13 @@ export default function MattersPage() {
                           className="btn btn-secondary btn-sm"
                           onClick={() => openEditModal(matter)}
                         >
-                          Edit
+                          Modifica
                         </button>
                         <button
                           className="btn btn-danger btn-sm"
                           onClick={() => handleDelete(matter.id)}
                         >
-                          Delete
+                          Cancella
                         </button>
                       </div>
                     </td>
@@ -150,7 +150,7 @@ export default function MattersPage() {
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
             </svg>
-            <p>No matters found. Add your first subject matter!</p>
+            <p>Nessuna materia presente, usa il bottone "Aggiungi una materia".</p>
           </div>
         )}
       </div>
@@ -158,24 +158,24 @@ export default function MattersPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={closeModal}
-        title={editingMatter ? "Edit Matter" : "Add New Matter"}
+        title={editingMatter ? "Modifica materia" : "Aggiungi una nuova materia"}
       >
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="name">Name</label>
+            <label htmlFor="name">Nome</label>
             <input
               type="text"
               id="name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Mathematics, History, Science"
+              placeholder="e.g., Matematica, Storia, Scienze"
               required
             />
           </div>
           <div className="form-group">
-            <label>Default Requirements</label>
+            <label>Requisiti di default</label>
             <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
-              These requirements will be applied by default when assigning this matter to a class.
+              Questi requisiti verranno applicati ogni volta che assegnerai la materia ad una classe.
             </p>
             <div className="checkbox-group">
               {Object.values(MatterRequirement).map((req) => (
@@ -202,14 +202,14 @@ export default function MattersPage() {
           </div>
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={closeModal}>
-              Cancel
+              Annulla
             </button>
             <button
               type="submit"
               className="btn btn-primary"
               disabled={createMutation.isPending || updateMutation.isPending}
             >
-              {editingMatter ? "Update" : "Create"}
+              {editingMatter ? "Aggiorna" : "Crea"}
             </button>
           </div>
         </form>
