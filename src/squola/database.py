@@ -1,7 +1,6 @@
 """Database connection and session management."""
 
 from collections.abc import Generator
-from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -9,7 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from squola.models import Base
 
 # Default database path - SQLite for now, prepared for future DB migration
-DATABASE_URL = "sqlite:///./squola.db"
+DATABASE_URL = "sqlite:///./db/squola.db"
 
 
 def get_engine(database_url: str = DATABASE_URL):
@@ -18,7 +17,7 @@ def get_engine(database_url: str = DATABASE_URL):
     connect_args = {}
     if database_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
-    
+
     return create_engine(database_url, connect_args=connect_args)
 
 
@@ -40,7 +39,7 @@ def init_db() -> None:
 def get_db() -> Generator[Session, None, None]:
     """
     Dependency that provides a database session.
-    
+
     Yields a session and ensures it's closed after use.
     """
     db = SessionLocal()
