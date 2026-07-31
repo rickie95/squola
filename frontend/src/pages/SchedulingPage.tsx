@@ -453,8 +453,8 @@ export default function SchedulingPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {scheduleData[day]
-                        .toSorted(
+                      {[...(scheduleData[day] || [])]
+                        .sort(
                           (a: ScheduleSlot, b: ScheduleSlot) =>
                             HOUR_ORDER.indexOf(a.hour) - HOUR_ORDER.indexOf(b.hour)
                         )
@@ -499,13 +499,13 @@ export default function SchedulingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {slots
-                    .toSorted(
-                      (a, b) =>
+                  {[...slots]
+                    .sort(
+                      (a: ScheduleSlot, b: ScheduleSlot) =>
                         DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day) ||
                         HOUR_ORDER.indexOf(a.hour) - HOUR_ORDER.indexOf(b.hour)
                     )
-                    .map((slot) => (
+                    .map((slot: ScheduleSlot) => (
                       <tr key={`${slot.day}-${slot.hour}-${slot.matter}`}>
                         <td>{slot.day}</td>
                         <td>{slot.hour}</td>

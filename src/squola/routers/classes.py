@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from squola.auth import get_current_workspace
 from squola.database import get_db
-from squola.models import SchoolClass, ClassMatterAssignment, Matter, Teacher
+from squola.models import ClassMatterAssignment, Matter, SchoolClass, Teacher, Workspace
 from squola.schemas import (
     SchoolClassCreate,
     SchoolClassUpdate,
@@ -20,18 +21,25 @@ router = APIRouter(prefix="/classes", tags=["classes"])
 
 
 @router.get("", response_model=list[SchoolClassResponse])
-def list_classes(db: Session = Depends(get_db)) -> list[SchoolClass]:
+def list_classes(
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> list[SchoolClass]:
     """List all school classes."""
-    stmt = select(SchoolClass)
+    stmt = select(SchoolClass).where(SchoolClass.workspace_id == workspace.id)
     return list(db.scalars(stmt).all())
 
 
 @router.get("/{class_id}", response_model=SchoolClassWithAssignmentsResponse)
-def get_class(class_id: int, db: Session = Depends(get_db)) -> SchoolClass:
+def get_class(
+    class_id: int,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> SchoolClass:
     """Get a specific school class by ID with its matter assignments."""
     stmt = (
         select(SchoolClass)
-        .where(SchoolClass.id == class_id)
+        .where(SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id)
         .options(
             selectinload(SchoolClass.matter_assignments)
             .selectinload(ClassMatterAssignment.matter),
@@ -49,12 +57,17 @@ def get_class(class_id: int, db: Session = Depends(get_db)) -> SchoolClass:
 
 
 @router.post("", response_model=SchoolClassResponse, status_code=status.HTTP_201_CREATED)
-def create_class(class_data: SchoolClassCreate, db: Session = Depends(get_db)) -> SchoolClass:
+def create_class(
+    class_data: SchoolClassCreate,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> SchoolClass:
     """Create a new school class."""
     # Check if class with same year and section already exists
     stmt = select(SchoolClass).where(
         SchoolClass.year == class_data.year,
         SchoolClass.section == class_data.section,
+        SchoolClass.workspace_id == workspace.id,
     )
     existing = db.scalars(stmt).first()
     if existing:
@@ -64,6 +77,7 @@ def create_class(class_data: SchoolClassCreate, db: Session = Depends(get_db)) -
         )
     
     school_class = SchoolClass(
+        workspace_id=workspace.id,
         year=class_data.year,
         section=class_data.section,
     )
@@ -77,10 +91,11 @@ def create_class(class_data: SchoolClassCreate, db: Session = Depends(get_db)) -
 def update_class(
     class_id: int,
     class_data: SchoolClassUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
 ) -> SchoolClass:
     """Update an existing school class."""
-    stmt = select(SchoolClass).where(SchoolClass.id == class_id)
+    stmt = select(SchoolClass).where(SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id)
     school_class = db.scalars(stmt).first()
     if not school_class:
         raise HTTPException(
@@ -98,6 +113,7 @@ def update_class(
             SchoolClass.year == new_year,
             SchoolClass.section == new_section,
             SchoolClass.id != class_id,
+            SchoolClass.workspace_id == workspace.id,
         )
         existing = db.scalars(stmt).first()
         if existing:
@@ -115,9 +131,13 @@ def update_class(
 
 
 @router.delete("/{class_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_class(class_id: int, db: Session = Depends(get_db)) -> None:
+def delete_class(
+    class_id: int,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> None:
     """Delete a school class."""
-    stmt = select(SchoolClass).where(SchoolClass.id == class_id)
+    stmt = select(SchoolClass).where(SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id)
     school_class = db.scalars(stmt).first()
     if not school_class:
         raise HTTPException(
@@ -132,10 +152,14 @@ def delete_class(class_id: int, db: Session = Depends(get_db)) -> None:
 # ============ Class Matter Assignments Endpoints ============
 
 @router.get("/{class_id}/assignments", response_model=list[ClassMatterAssignmentResponse])
-def list_class_assignments(class_id: int, db: Session = Depends(get_db)) -> list[ClassMatterAssignment]:
+def list_class_assignments(
+    class_id: int,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> list[ClassMatterAssignment]:
     """List all matter-teacher assignments for a class."""
     # Verify class exists
-    stmt = select(SchoolClass).where(SchoolClass.id == class_id)
+    stmt = select(SchoolClass).where(SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id)
     school_class = db.scalars(stmt).first()
     if not school_class:
         raise HTTPException(
@@ -145,7 +169,10 @@ def list_class_assignments(class_id: int, db: Session = Depends(get_db)) -> list
     
     stmt = (
         select(ClassMatterAssignment)
-        .where(ClassMatterAssignment.class_id == class_id)
+        .where(
+            ClassMatterAssignment.class_id == class_id,
+            ClassMatterAssignment.workspace_id == workspace.id,
+        )
         .options(
             selectinload(ClassMatterAssignment.matter),
             selectinload(ClassMatterAssignment.teacher),
@@ -162,7 +189,8 @@ def list_class_assignments(class_id: int, db: Session = Depends(get_db)) -> list
 def create_class_assignment(
     class_id: int,
     assignment_data: ClassMatterAssignmentCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
 ) -> ClassMatterAssignment:
     """
     Assign a teacher to teach a specific matter in this class.
@@ -170,7 +198,7 @@ def create_class_assignment(
     Each class can have only one teacher per matter.
     """
     # Verify class exists
-    stmt = select(SchoolClass).where(SchoolClass.id == class_id)
+    stmt = select(SchoolClass).where(SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id)
     school_class = db.scalars(stmt).first()
     if not school_class:
         raise HTTPException(
@@ -179,7 +207,7 @@ def create_class_assignment(
         )
     
     # Verify matter exists
-    stmt = select(Matter).where(Matter.id == assignment_data.matter_id)
+    stmt = select(Matter).where(Matter.id == assignment_data.matter_id, Matter.workspace_id == workspace.id)
     matter = db.scalars(stmt).first()
     if not matter:
         raise HTTPException(
@@ -188,7 +216,7 @@ def create_class_assignment(
         )
     
     # Verify teacher exists
-    stmt = select(Teacher).where(Teacher.id == assignment_data.teacher_id)
+    stmt = select(Teacher).where(Teacher.id == assignment_data.teacher_id, Teacher.workspace_id == workspace.id)
     teacher = db.scalars(stmt).first()
     if not teacher:
         raise HTTPException(
@@ -200,6 +228,7 @@ def create_class_assignment(
     stmt = select(ClassMatterAssignment).where(
         ClassMatterAssignment.class_id == class_id,
         ClassMatterAssignment.matter_id == assignment_data.matter_id,
+        ClassMatterAssignment.workspace_id == workspace.id,
     )
     existing = db.scalars(stmt).first()
     if existing:
@@ -209,6 +238,7 @@ def create_class_assignment(
         )
     
     assignment = ClassMatterAssignment(
+        workspace_id=workspace.id,
         class_id=class_id,
         matter_id=assignment_data.matter_id,
         teacher_id=assignment_data.teacher_id,
@@ -238,7 +268,8 @@ def update_class_assignment(
     class_id: int,
     assignment_id: int,
     assignment_data: ClassMatterAssignmentUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
 ) -> ClassMatterAssignment:
     """Update a class matter assignment (change teacher or hours)."""
     stmt = (
@@ -246,6 +277,7 @@ def update_class_assignment(
         .where(
             ClassMatterAssignment.id == assignment_id,
             ClassMatterAssignment.class_id == class_id,
+            ClassMatterAssignment.workspace_id == workspace.id,
         )
         .options(
             selectinload(ClassMatterAssignment.matter),
@@ -261,7 +293,7 @@ def update_class_assignment(
     
     if assignment_data.teacher_id is not None:
         # Verify new teacher exists
-        stmt = select(Teacher).where(Teacher.id == assignment_data.teacher_id)
+        stmt = select(Teacher).where(Teacher.id == assignment_data.teacher_id, Teacher.workspace_id == workspace.id)
         teacher = db.scalars(stmt).first()
         if not teacher:
             raise HTTPException(
@@ -282,11 +314,17 @@ def update_class_assignment(
 
 
 @router.delete("/{class_id}/assignments/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_class_assignment(class_id: int, assignment_id: int, db: Session = Depends(get_db)) -> None:
+def delete_class_assignment(
+    class_id: int,
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> None:
     """Remove a matter-teacher assignment from a class."""
     stmt = select(ClassMatterAssignment).where(
         ClassMatterAssignment.id == assignment_id,
         ClassMatterAssignment.class_id == class_id,
+        ClassMatterAssignment.workspace_id == workspace.id,
     )
     assignment = db.scalars(stmt).first()
     if not assignment:

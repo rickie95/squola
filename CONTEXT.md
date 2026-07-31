@@ -1,5 +1,14 @@
 # Squola — Domain Glossary
 
+## Workspace
+Contenitore di ownership dei dati dell'app (insegnanti, classi, materie, assegnazioni, orari). In questa fase ogni utente registra e possiede un workspace.
+
+## User
+Identità autenticabile dell'applicazione. Ha username globale univoco e accede ai dati del proprio workspace.
+
+## Sessione autenticata (`AuthSession`)
+Sessione persistente server-side associata a uno user e identificata via cookie HTTP-only.
+
 ## Indisponibilità (`TeacherUnavailability`)
 Uno slot orario (giorno + ora) in cui un insegnante non è disponibile per il planning — ad esempio perché impegnato in un'altra scuola. Il solver esclude questi slot dall'assegnazione. Di default un insegnante non ha indisponibilità (tutti gli slot sono assegnabili).
 

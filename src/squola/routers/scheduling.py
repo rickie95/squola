@@ -9,8 +9,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from squola.auth import get_current_workspace
 from squola.database import get_db
-from squola.models import SavedSchedule
+from squola.models import SavedSchedule, Workspace
 from squola.scheduler import generate_schedule, GeneratedSchedule
 from squola.schemas import (
     SavedScheduleListResponse,
@@ -78,6 +79,7 @@ class GenerateScheduleResponse(BaseModel):
 def generate_schedule_endpoint(
     request: GenerateScheduleRequest,
     db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
 ) -> GenerateScheduleResponse:
     """
     Generate a new school schedule.
@@ -95,6 +97,7 @@ def generate_schedule_endpoint(
     """
     schedule = generate_schedule(
         db,
+        workspace_id=workspace.id,
         time_limit_seconds=request.time_limit_seconds,
         save_to_db=True,
         nickname=request.nickname,
@@ -132,7 +135,10 @@ def generate_schedule_endpoint(
 
 
 @router.get("/preview")
-def preview_scheduling_data(db: Session = Depends(get_db)) -> dict[str, Any]:
+def preview_scheduling_data(
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> dict[str, Any]:
     """
     Preview the data that will be used for scheduling.
     
@@ -144,7 +150,7 @@ def preview_scheduling_data(db: Session = Depends(get_db)) -> dict[str, Any]:
     """
     from squola.scheduler import fetch_scheduling_data, DAYS_OF_WEEK, HOURS_PER_DAY
     
-    data = fetch_scheduling_data(db)
+    data = fetch_scheduling_data(db, workspace_id=workspace.id)
     
     # Calculate total hours needed
     total_hours = sum(a.hours_per_week for a in data.assignments)
@@ -225,7 +231,10 @@ def preview_scheduling_data(db: Session = Depends(get_db)) -> dict[str, Any]:
 # ============ Saved Schedules CRUD ============
 
 @router.get("/schedules", response_model=list[SavedScheduleListResponse])
-def list_saved_schedules(db: Session = Depends(get_db)) -> list[SavedScheduleListResponse]:
+def list_saved_schedules(
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> list[SavedScheduleListResponse]:
     """
     List all saved schedules.
     
@@ -234,6 +243,7 @@ def list_saved_schedules(db: Session = Depends(get_db)) -> list[SavedScheduleLis
     """
     schedules = (
         db.query(SavedSchedule)
+        .filter(SavedSchedule.workspace_id == workspace.id)
         .order_by(SavedSchedule.created_at.desc())
         .all()
     )
@@ -256,11 +266,16 @@ def list_saved_schedules(db: Session = Depends(get_db)) -> list[SavedScheduleLis
 def get_saved_schedule(
     schedule_id: int,
     db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
 ) -> SavedScheduleResponse:
     """
     Get a specific saved schedule including its full data.
     """
-    schedule = db.query(SavedSchedule).filter(SavedSchedule.id == schedule_id).first()
+    schedule = (
+        db.query(SavedSchedule)
+        .filter(SavedSchedule.id == schedule_id, SavedSchedule.workspace_id == workspace.id)
+        .first()
+    )
     
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -282,11 +297,16 @@ def update_saved_schedule(
     schedule_id: int,
     data: SavedScheduleUpdate,
     db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
 ) -> SavedScheduleListResponse:
     """
     Update a saved schedule's nickname.
     """
-    schedule = db.query(SavedSchedule).filter(SavedSchedule.id == schedule_id).first()
+    schedule = (
+        db.query(SavedSchedule)
+        .filter(SavedSchedule.id == schedule_id, SavedSchedule.workspace_id == workspace.id)
+        .first()
+    )
     
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -312,11 +332,16 @@ def update_saved_schedule(
 def delete_saved_schedule(
     schedule_id: int,
     db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
 ) -> None:
     """
     Delete a saved schedule.
     """
-    schedule = db.query(SavedSchedule).filter(SavedSchedule.id == schedule_id).first()
+    schedule = (
+        db.query(SavedSchedule)
+        .filter(SavedSchedule.id == schedule_id, SavedSchedule.workspace_id == workspace.id)
+        .first()
+    )
     
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")

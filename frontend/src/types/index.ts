@@ -223,3 +223,40 @@ export interface SavedSchedule extends SavedScheduleListItem {
 export interface SavedScheduleUpdate {
   nickname?: string;
 }
+
+// ============ Auth & Account Types ============
+
+export interface AuthUser {
+  id: number;
+  username: string;
+}
+
+export interface Workspace {
+  id: number;
+  name: string;
+}
+
+export interface AuthSession {
+  user: AuthUser;
+  workspace: Workspace;
+}
+
+export interface RegisterRequest {
+  username: string;
+  password: string;
+  workspace_name?: string;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
+export interface RenameWorkspaceRequest {
+  name: string;
+}

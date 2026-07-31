@@ -3,6 +3,7 @@
 from enum import Enum
 from pydantic import BaseModel, Field
 
+from squola.auth import PASSWORD_MIN_LENGTH
 from squola.models import MatterRequirements, TeacherUnavailability
 
 
@@ -13,6 +14,47 @@ class SchedulePreference(str, Enum):
     MINIMIZE_GAPS = "minimize_gaps"
     MAXIMIZE_GAPS = "maximize_gaps"
     NONE = "none"
+
+
+# ============ Auth & Account Schemas ============
+
+class UserIdentityResponse(BaseModel):
+    id: int
+    username: str
+
+    model_config = {"from_attributes": True}
+
+
+class WorkspaceResponse(BaseModel):
+    id: int
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
+class AuthSessionResponse(BaseModel):
+    user: UserIdentityResponse
+    workspace: WorkspaceResponse
+
+
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=100)
+    password: str = Field(..., min_length=PASSWORD_MIN_LENGTH, max_length=255)
+    workspace_name: str | None = Field(None, min_length=1, max_length=255)
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=100)
+    password: str = Field(..., min_length=1, max_length=255)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=255)
+    new_password: str = Field(..., min_length=PASSWORD_MIN_LENGTH, max_length=255)
+
+
+class RenameWorkspaceRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
 
 
 # ============ Unavailability Schemas ============

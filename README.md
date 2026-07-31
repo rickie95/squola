@@ -1,14 +1,14 @@
 # Squola
 
-A single-user web app for generating school timetables. You feed it teachers, classes, subjects, and constraints — it spits out a valid weekly schedule.
+A web app for generating school timetables with workspace-scoped multiuser support. Each account owns a workspace and can manage only its own data.
 
 ## What it does
 
-The user inserts all the data (teachers with their unavailabilities and preferences, classes, subject matters with hours/week), and triggers a schedule generation. The solver finds a valid assignment of lessons to time slots respecting all constraints (no teacher in two places at once, teacher unavailabilities, subject requirements, scheduling preferences). Generated schedules are saved and can be browsed.
+The authenticated user inserts all workspace data (teachers with their unavailabilities and preferences, classes, subject matters with hours/week), and triggers a schedule generation. The solver finds a valid assignment of lessons to time slots respecting all constraints (no teacher in two places at once, teacher unavailabilities, subject requirements, scheduling preferences). Generated schedules are saved and can be browsed inside the same workspace.
 
 ## Architecture
 
-Full-stack single-user app:
+Full-stack app:
 
 - **Backend** — FastAPI app (`src/squola/`) with SQLite via SQLAlchemy. Routers for teachers, classes, matters, and scheduling. The scheduler uses Google OR-Tools CP-SAT solver to generate timetables as constraint-satisfaction problems.
 - **Frontend** — React 19 + TypeScript SPA (`frontend/`) built with Vite. Uses React Query for data fetching and React Router for navigation.
@@ -28,6 +28,9 @@ Full-stack single-user app:
 
 | Feature | Backend | Frontend |
 |---|---|---|
+| Registrazione/login a cookie HTTP-only | X | X |
+| Gestione account (cambio password, rename workspace, logout) | X | X |
+| Isolamento dati per workspace | X | X |
 | Gestione insegnanti (CRUD) | X | X |
 | Indisponibilità insegnante (slot e giorni) | X | X |
 | Preferenze di scheduling insegnante | X | X |

@@ -6,7 +6,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from squola.database import init_db
-from squola.routers import teachers_router, classes_router, matters_router, scheduling_router
+from squola.routers import (
+    account_router,
+    auth_router,
+    classes_router,
+    matters_router,
+    scheduling_router,
+    teachers_router,
+)
 
 
 @asynccontextmanager
@@ -37,6 +44,8 @@ app.include_router(teachers_router, prefix="/api")
 app.include_router(classes_router, prefix="/api")
 app.include_router(matters_router, prefix="/api")
 app.include_router(scheduling_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
+app.include_router(account_router, prefix="/api")
 
 
 @app.get("/")

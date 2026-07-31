@@ -23,16 +23,35 @@ import type {
   SavedScheduleListItem,
   SavedSchedule,
   SavedScheduleUpdate,
+  AuthSession,
+  RegisterRequest,
+  LoginRequest,
+  ChangePasswordRequest,
+  RenameWorkspaceRequest,
 } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      const path = window.location.pathname;
+      if (path !== "/login" && path !== "/register") {
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ============ Matters API ============
 
@@ -210,6 +229,47 @@ export const schedulingApi = {
 
   deleteSaved: async (id: number): Promise<void> => {
     await api.delete(`/scheduling/schedules/${id}`);
+  },
+};
+
+// ============ Auth API ============
+
+export const authApi = {
+  register: async (data: RegisterRequest): Promise<AuthSession> => {
+    const response = await api.post<AuthSession>("/auth/register", data);
+    return response.data;
+  },
+
+  login: async (data: LoginRequest): Promise<AuthSession> => {
+    const response = await api.post<AuthSession>("/auth/login", data);
+    return response.data;
+  },
+
+  logout: async (): Promise<void> => {
+    await api.post("/auth/logout");
+  },
+
+  me: async (): Promise<AuthSession> => {
+    const response = await api.get<AuthSession>("/auth/me");
+    return response.data;
+  },
+};
+
+// ============ Account API ============
+
+export const accountApi = {
+  get: async (): Promise<AuthSession> => {
+    const response = await api.get<AuthSession>("/account");
+    return response.data;
+  },
+
+  changePassword: async (data: ChangePasswordRequest): Promise<void> => {
+    await api.patch("/account/password", data);
+  },
+
+  renameWorkspace: async (data: RenameWorkspaceRequest): Promise<AuthSession> => {
+    const response = await api.patch<AuthSession>("/account/workspace", data);
+    return response.data;
   },
 };
 

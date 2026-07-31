@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from squola.auth import get_current_workspace
 from squola.database import get_db
-from squola.models import Teacher, Matter, TeacherUnavailability
+from squola.models import Matter, Teacher, TeacherUnavailability, Workspace
 from squola.schemas import (
     TeacherCreate,
     TeacherUpdate,
@@ -19,18 +20,25 @@ router = APIRouter(prefix="/teachers", tags=["teachers"])
 
 
 @router.get("", response_model=list[TeacherResponse])
-def list_teachers(db: Session = Depends(get_db)) -> list[Teacher]:
+def list_teachers(
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> list[Teacher]:
     """List all teachers in the roster."""
-    stmt = select(Teacher)
+    stmt = select(Teacher).where(Teacher.workspace_id == workspace.id)
     return list(db.scalars(stmt).all())
 
 
 @router.get("/{teacher_id}", response_model=TeacherWithMattersResponse)
-def get_teacher(teacher_id: int, db: Session = Depends(get_db)) -> Teacher:
+def get_teacher(
+    teacher_id: int,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> Teacher:
     """Get a specific teacher by ID with their matters and blacklisted slots."""
     stmt = (
         select(Teacher)
-        .where(Teacher.id == teacher_id)
+        .where(Teacher.id == teacher_id, Teacher.workspace_id == workspace.id)
         .options(
             selectinload(Teacher.matters),
             selectinload(Teacher.unavailabilities)
@@ -46,12 +54,19 @@ def get_teacher(teacher_id: int, db: Session = Depends(get_db)) -> Teacher:
 
 
 @router.post("", response_model=TeacherWithMattersResponse, status_code=status.HTTP_201_CREATED)
-def create_teacher(teacher_data: TeacherCreate, db: Session = Depends(get_db)) -> Teacher:
+def create_teacher(
+    teacher_data: TeacherCreate,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> Teacher:
     """Add a new teacher to the roster."""
     # Fetch matters if provided
     matters = []
     if teacher_data.matter_ids:
-        stmt = select(Matter).where(Matter.id.in_(teacher_data.matter_ids))
+        stmt = select(Matter).where(
+            Matter.id.in_(teacher_data.matter_ids),
+            Matter.workspace_id == workspace.id,
+        )
         matters = list(db.scalars(stmt).all())
         if len(matters) != len(teacher_data.matter_ids):
             found_ids = {m.id for m in matters}
@@ -62,6 +77,7 @@ def create_teacher(teacher_data: TeacherCreate, db: Session = Depends(get_db)) -
             )
     
     teacher = Teacher(
+        workspace_id=workspace.id,
         first_name=teacher_data.first_name,
         last_name=teacher_data.last_name,
         email=teacher_data.email,
@@ -78,12 +94,13 @@ def create_teacher(teacher_data: TeacherCreate, db: Session = Depends(get_db)) -
 def update_teacher(
     teacher_id: int,
     teacher_data: TeacherUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
 ) -> Teacher:
     """Update an existing teacher."""
     stmt = (
         select(Teacher)
-        .where(Teacher.id == teacher_id)
+        .where(Teacher.id == teacher_id, Teacher.workspace_id == workspace.id)
         .options(selectinload(Teacher.matters), selectinload(Teacher.unavailabilities))
     )
     teacher = db.scalars(stmt).first()
@@ -106,7 +123,10 @@ def update_teacher(
     # Update matters if provided
     if teacher_data.matter_ids is not None:
         if teacher_data.matter_ids:
-            stmt = select(Matter).where(Matter.id.in_(teacher_data.matter_ids))
+            stmt = select(Matter).where(
+                Matter.id.in_(teacher_data.matter_ids),
+                Matter.workspace_id == workspace.id,
+            )
             matters = list(db.scalars(stmt).all())
             if len(matters) != len(teacher_data.matter_ids):
                 found_ids = {m.id for m in matters}
@@ -125,9 +145,13 @@ def update_teacher(
 
 
 @router.delete("/{teacher_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_teacher(teacher_id: int, db: Session = Depends(get_db)) -> None:
+def delete_teacher(
+    teacher_id: int,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> None:
     """Remove a teacher from the roster."""
-    stmt = select(Teacher).where(Teacher.id == teacher_id)
+    stmt = select(Teacher).where(Teacher.id == teacher_id, Teacher.workspace_id == workspace.id)
     teacher = db.scalars(stmt).first()
     if not teacher:
         raise HTTPException(
@@ -142,9 +166,13 @@ def delete_teacher(teacher_id: int, db: Session = Depends(get_db)) -> None:
 # ============ Unavailability Endpoints ============
 
 @router.get("/{teacher_id}/unavailabilities", response_model=list[UnavailabilityResponse])
-def list_unavailabilities(teacher_id: int, db: Session = Depends(get_db)) -> list[TeacherUnavailability]:
+def list_unavailabilities(
+    teacher_id: int,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> list[TeacherUnavailability]:
     """List all unavailability slots for a teacher."""
-    stmt = select(Teacher).where(Teacher.id == teacher_id)
+    stmt = select(Teacher).where(Teacher.id == teacher_id, Teacher.workspace_id == workspace.id)
     teacher = db.scalars(stmt).first()
     if not teacher:
         raise HTTPException(
@@ -152,7 +180,10 @@ def list_unavailabilities(teacher_id: int, db: Session = Depends(get_db)) -> lis
             detail=f"Teacher with id {teacher_id} not found"
         )
 
-    stmt = select(TeacherUnavailability).where(TeacherUnavailability.teacher_id == teacher_id)
+    stmt = select(TeacherUnavailability).where(
+        TeacherUnavailability.teacher_id == teacher_id,
+        TeacherUnavailability.workspace_id == workspace.id,
+    )
     return list(db.scalars(stmt).all())
 
 
@@ -164,10 +195,11 @@ def list_unavailabilities(teacher_id: int, db: Session = Depends(get_db)) -> lis
 def add_unavailability(
     teacher_id: int,
     slot_data: UnavailabilityCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
 ) -> TeacherUnavailability:
     """Add an unavailability slot for a teacher (e.g., hours at another school)."""
-    stmt = select(Teacher).where(Teacher.id == teacher_id)
+    stmt = select(Teacher).where(Teacher.id == teacher_id, Teacher.workspace_id == workspace.id)
     teacher = db.scalars(stmt).first()
     if not teacher:
         raise HTTPException(
@@ -177,6 +209,7 @@ def add_unavailability(
 
     stmt = select(TeacherUnavailability).where(
         TeacherUnavailability.teacher_id == teacher_id,
+        TeacherUnavailability.workspace_id == workspace.id,
         TeacherUnavailability.day_of_week == slot_data.day_of_week,
         TeacherUnavailability.hour_slot == slot_data.hour_slot,
     )
@@ -187,6 +220,7 @@ def add_unavailability(
         )
 
     slot = TeacherUnavailability(
+        workspace_id=workspace.id,
         teacher_id=teacher_id,
         day_of_week=slot_data.day_of_week,
         hour_slot=slot_data.hour_slot,
@@ -198,11 +232,17 @@ def add_unavailability(
 
 
 @router.delete("/{teacher_id}/unavailabilities/{slot_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_unavailability(teacher_id: int, slot_id: int, db: Session = Depends(get_db)) -> None:
+def remove_unavailability(
+    teacher_id: int,
+    slot_id: int,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> None:
     """Remove an unavailability slot for a teacher."""
     stmt = select(TeacherUnavailability).where(
         TeacherUnavailability.id == slot_id,
         TeacherUnavailability.teacher_id == teacher_id,
+        TeacherUnavailability.workspace_id == workspace.id,
     )
     slot = db.scalars(stmt).first()
     if not slot:

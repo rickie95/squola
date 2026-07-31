@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from squola.auth import get_current_workspace
 from squola.database import get_db
-from squola.models import Matter
+from squola.models import Matter, Workspace
 from squola.schemas import (
     MatterCreate,
     MatterUpdate,
@@ -17,20 +18,27 @@ router = APIRouter(prefix="/matters", tags=["matters"])
 
 
 @router.get("", response_model=list[MatterResponse])
-def list_matters(db: Session = Depends(get_db)) -> list[MatterResponse]:
+def list_matters(
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> list[MatterResponse]:
     """List all subject matters."""
-    stmt = select(Matter)
+    stmt = select(Matter).where(Matter.workspace_id == workspace.id)
     res: list[Matter] = list(db.scalars(stmt).all())
     results = [MatterResponse(id=r.id, name=r.name, default_requirements=r.default_requirements) for r in res]
     return results
 
 
 @router.get("/{matter_id}", response_model=MatterWithTeachersResponse)
-def get_matter(matter_id: int, db: Session = Depends(get_db)) -> Matter:
+def get_matter(
+    matter_id: int,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> Matter:
     """Get a specific matter by ID with its teachers."""
     stmt = (
         select(Matter)
-        .where(Matter.id == matter_id)
+        .where(Matter.id == matter_id, Matter.workspace_id == workspace.id)
         .options(selectinload(Matter.teachers))
     )
     matter = db.scalars(stmt).first()
@@ -43,10 +51,17 @@ def get_matter(matter_id: int, db: Session = Depends(get_db)) -> Matter:
 
 
 @router.post("", response_model=MatterResponse, status_code=status.HTTP_201_CREATED)
-def create_matter(matter_data: MatterCreate, db: Session = Depends(get_db)) -> Matter:
+def create_matter(
+    matter_data: MatterCreate,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> Matter:
     """Create a new subject matter."""
     # Check if matter with same name already exists
-    stmt = select(Matter).where(Matter.name == matter_data.name)
+    stmt = select(Matter).where(
+        Matter.name == matter_data.name,
+        Matter.workspace_id == workspace.id,
+    )
     existing = db.scalars(stmt).first()
     if existing:
         raise HTTPException(
@@ -55,6 +70,7 @@ def create_matter(matter_data: MatterCreate, db: Session = Depends(get_db)) -> M
         )
     
     matter = Matter(
+        workspace_id=workspace.id,
         name=matter_data.name,
         default_requirements=matter_data.default_requirements or []
     )
@@ -68,10 +84,11 @@ def create_matter(matter_data: MatterCreate, db: Session = Depends(get_db)) -> M
 def update_matter(
     matter_id: int,
     matter_data: MatterUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
 ) -> Matter:
     """Update an existing matter."""
-    stmt = select(Matter).where(Matter.id == matter_id)
+    stmt = select(Matter).where(Matter.id == matter_id, Matter.workspace_id == workspace.id)
     matter = db.scalars(stmt).first()
     if not matter:
         raise HTTPException(
@@ -84,6 +101,7 @@ def update_matter(
         stmt = select(Matter).where(
             Matter.name == matter_data.name,
             Matter.id != matter_id,
+            Matter.workspace_id == workspace.id,
         )
         existing = db.scalars(stmt).first()
         if existing:
@@ -102,9 +120,13 @@ def update_matter(
 
 
 @router.delete("/{matter_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_matter(matter_id: int, db: Session = Depends(get_db)) -> None:
+def delete_matter(
+    matter_id: int,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> None:
     """Delete a subject matter."""
-    stmt = select(Matter).where(Matter.id == matter_id)
+    stmt = select(Matter).where(Matter.id == matter_id, Matter.workspace_id == workspace.id)
     matter = db.scalars(stmt).first()
     if not matter:
         raise HTTPException(

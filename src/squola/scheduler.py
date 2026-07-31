@@ -144,7 +144,7 @@ class GeneratedSchedule:
             json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
 
 
-def fetch_scheduling_data(db: Session) -> SchedulingData:
+def fetch_scheduling_data(db: Session, workspace_id: int) -> SchedulingData:
     """
     Fetch all necessary data from the database for scheduling.
     
@@ -158,16 +158,22 @@ def fetch_scheduling_data(db: Session) -> SchedulingData:
     # Fetch teachers with eager loading of unavailabilities
     data.teachers = list(
         db.query(Teacher)
+        .filter(Teacher.workspace_id == workspace_id)
         .options(joinedload(Teacher.unavailabilities))
         .all()
     )
     
     # Fetch all classes
-    data.classes = list(db.query(SchoolClass).all())
+    data.classes = list(
+        db.query(SchoolClass)
+        .filter(SchoolClass.workspace_id == workspace_id)
+        .all()
+    )
     
     # Fetch all assignments with eager loading of related entities
     data.assignments = list(
         db.query(ClassMatterAssignment)
+        .filter(ClassMatterAssignment.workspace_id == workspace_id)
         .options(
             joinedload(ClassMatterAssignment.teacher),
             joinedload(ClassMatterAssignment.school_class),
@@ -177,7 +183,11 @@ def fetch_scheduling_data(db: Session) -> SchedulingData:
     )
     
     # Fetch all unavailability slots
-    data.unavailabilities = list(db.query(TeacherUnavailability).all())
+    data.unavailabilities = list(
+        db.query(TeacherUnavailability)
+        .filter(TeacherUnavailability.workspace_id == workspace_id)
+        .all()
+    )
     
     # Build index mappings
     for i, teacher in enumerate(data.teachers):
@@ -587,6 +597,7 @@ class ScheduleGenerator:
 
 def generate_schedule(
     db: Session,
+    workspace_id: int,
     time_limit_seconds: float = 60.0,
     save_to_db: bool = True,
     nickname: str | None = None,
@@ -599,6 +610,7 @@ def generate_schedule(
     
     Args:
         db: SQLAlchemy database session
+        workspace_id: Workspace owner for the generated schedule
         time_limit_seconds: Maximum solving time
         save_to_db: Whether to save the schedule to the database
         nickname: Optional user-friendly name for the schedule
@@ -607,7 +619,7 @@ def generate_schedule(
         GeneratedSchedule containing the solution
     """
     # Fetch all data from database
-    data = fetch_scheduling_data(db)
+    data = fetch_scheduling_data(db, workspace_id=workspace_id)
     
     if not data.assignments:
         schedule = GeneratedSchedule()
@@ -622,13 +634,14 @@ def generate_schedule(
     
     # Save to database if requested and successful
     if save_to_db and schedule.status in ("OPTIMAL", "FEASIBLE"):
-        save_schedule_to_db(db, schedule, nickname)
+        save_schedule_to_db(db, workspace_id, schedule, nickname)
     
     return schedule
 
 
 def save_schedule_to_db(
     db: Session,
+    workspace_id: int,
     schedule: GeneratedSchedule,
     nickname: str | None = None,
 ) -> SavedSchedule:
@@ -637,6 +650,7 @@ def save_schedule_to_db(
     
     Args:
         db: SQLAlchemy database session
+        workspace_id: Workspace owner for the schedule
         schedule: The generated schedule to save
         nickname: Optional user-friendly name
         
@@ -651,6 +665,7 @@ def save_schedule_to_db(
     schedule_data_json = json.dumps(schedule_dict["schedule"])
     
     saved_schedule = SavedSchedule(
+        workspace_id=workspace_id,
         name=name,
         nickname=nickname,
         status=schedule.status,
