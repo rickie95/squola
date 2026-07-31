@@ -1,0 +1,13 @@
+services:
+
+  frontend:
+    image: squola/fe
+    build: ./frontend
+    ports:
+      - 8080:80
+
+  backend:
+    image: squola/be
+    build: .
+    volumes:
+      - ./db/:/app/db/

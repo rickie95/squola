@@ -1,0 +1,15 @@
+:80 {
+    root * /srv
+    encode gzip
+
+    # Proxy API calls to the backend
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # SPA fallback: serve index.html for all unmatched routes
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+}
