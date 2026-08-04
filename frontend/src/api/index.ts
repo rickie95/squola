@@ -158,8 +158,9 @@ export const classesApi = {
     return response.data;
   },
 
-  delete: async (id: number): Promise<void> => {
-    await api.delete(`/classes/${id}`);
+  clone: async (id: number, data: SchoolClassCreate): Promise<SchoolClass> => {
+    const response = await api.post<SchoolClass>(`/classes/${id}/clone`, data);
+    return response.data;
   },
 
   // Matter assignments

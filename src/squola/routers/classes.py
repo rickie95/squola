@@ -8,13 +8,13 @@ from squola.auth import get_current_workspace
 from squola.database import get_db
 from squola.models import ClassMatterAssignment, Matter, SchoolClass, Teacher, Workspace
 from squola.schemas import (
-    SchoolClassCreate,
-    SchoolClassUpdate,
-    SchoolClassResponse,
-    SchoolClassWithAssignmentsResponse,
     ClassMatterAssignmentCreate,
-    ClassMatterAssignmentUpdate,
     ClassMatterAssignmentResponse,
+    ClassMatterAssignmentUpdate,
+    SchoolClassCreate,
+    SchoolClassResponse,
+    SchoolClassUpdate,
+    SchoolClassWithAssignmentsResponse,
 )
 
 router = APIRouter(prefix="/classes", tags=["classes"])
@@ -41,17 +41,16 @@ def get_class(
         select(SchoolClass)
         .where(SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id)
         .options(
-            selectinload(SchoolClass.matter_assignments)
-            .selectinload(ClassMatterAssignment.matter),
-            selectinload(SchoolClass.matter_assignments)
-            .selectinload(ClassMatterAssignment.teacher),
+            selectinload(SchoolClass.matter_assignments).selectinload(ClassMatterAssignment.matter),
+            selectinload(SchoolClass.matter_assignments).selectinload(
+                ClassMatterAssignment.teacher
+            ),
         )
     )
     school_class = db.scalars(stmt).first()
     if not school_class:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Class with id {class_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Class with id {class_id} not found"
         )
     return school_class
 
@@ -73,9 +72,9 @@ def create_class(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Class {class_data.year}{class_data.section} already exists"
+            detail=f"Class {class_data.year}{class_data.section} already exists",
         )
-    
+
     school_class = SchoolClass(
         workspace_id=workspace.id,
         year=class_data.year,
@@ -95,18 +94,19 @@ def update_class(
     workspace: Workspace = Depends(get_current_workspace),
 ) -> SchoolClass:
     """Update an existing school class."""
-    stmt = select(SchoolClass).where(SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id)
+    stmt = select(SchoolClass).where(
+        SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id
+    )
     school_class = db.scalars(stmt).first()
     if not school_class:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Class with id {class_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Class with id {class_id} not found"
         )
-    
+
     # Update fields if provided
     new_year = class_data.year if class_data.year is not None else school_class.year
     new_section = class_data.section if class_data.section is not None else school_class.section
-    
+
     # Check for conflicts if changing year or section
     if new_year != school_class.year or new_section != school_class.section:
         stmt = select(SchoolClass).where(
@@ -119,12 +119,12 @@ def update_class(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Class {new_year}{new_section} already exists"
+                detail=f"Class {new_year}{new_section} already exists",
             )
-    
+
     school_class.year = new_year
     school_class.section = new_section
-    
+
     db.commit()
     db.refresh(school_class)
     return school_class
@@ -137,19 +137,84 @@ def delete_class(
     workspace: Workspace = Depends(get_current_workspace),
 ) -> None:
     """Delete a school class."""
-    stmt = select(SchoolClass).where(SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id)
+    stmt = select(SchoolClass).where(
+        SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id
+    )
     school_class = db.scalars(stmt).first()
     if not school_class:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Class with id {class_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Class with id {class_id} not found"
         )
-    
+
     db.delete(school_class)
     db.commit()
 
 
-# ============ Class Matter Assignments Endpoints ============
+@router.post(
+    "/{class_id}/clone", response_model=SchoolClassResponse, status_code=status.HTTP_201_CREATED
+)
+def clone_class(
+    class_id: int,
+    class_data: SchoolClassCreate,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> SchoolClass:
+    """Clone a school class and its matter assignments."""
+    # Verify source class exists
+    stmt = select(SchoolClass).where(
+        SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id
+    )
+    source_class = db.scalars(stmt).first()
+    if not source_class:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Source class with id {class_id} not found",
+        )
+
+    # Check if target class already exists
+    stmt = select(SchoolClass).where(
+        SchoolClass.year == class_data.year,
+        SchoolClass.section == class_data.section,
+        SchoolClass.workspace_id == workspace.id,
+    )
+    existing = db.scalars(stmt).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Class {class_data.year}{class_data.section} already exists",
+        )
+
+    # Create the new class
+    new_class = SchoolClass(
+        workspace_id=workspace.id,
+        year=class_data.year,
+        section=class_data.section,
+    )
+    db.add(new_class)
+    db.flush()  # Get new_class.id without committing yet
+
+    # Copy assignments from source class
+    assignments_stmt = select(ClassMatterAssignment).where(
+        ClassMatterAssignment.class_id == class_id,
+        ClassMatterAssignment.workspace_id == workspace.id,
+    )
+    source_assignments = db.scalars(assignments_stmt).all()
+
+    for assignment in source_assignments:
+        new_assignment = ClassMatterAssignment(
+            workspace_id=workspace.id,
+            class_id=new_class.id,
+            matter_id=assignment.matter_id,
+            teacher_id=assignment.teacher_id,
+            hours_per_week=assignment.hours_per_week,
+            requirements=assignment.requirements,
+        )
+        db.add(new_assignment)
+
+    db.commit()
+    db.refresh(new_class)
+    return new_class
+
 
 @router.get("/{class_id}/assignments", response_model=list[ClassMatterAssignmentResponse])
 def list_class_assignments(
@@ -159,14 +224,15 @@ def list_class_assignments(
 ) -> list[ClassMatterAssignment]:
     """List all matter-teacher assignments for a class."""
     # Verify class exists
-    stmt = select(SchoolClass).where(SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id)
+    stmt = select(SchoolClass).where(
+        SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id
+    )
     school_class = db.scalars(stmt).first()
     if not school_class:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Class with id {class_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Class with id {class_id} not found"
         )
-    
+
     stmt = (
         select(ClassMatterAssignment)
         .where(
@@ -184,7 +250,7 @@ def list_class_assignments(
 @router.post(
     "/{class_id}/assignments",
     response_model=ClassMatterAssignmentResponse,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
 )
 def create_class_assignment(
     class_id: int,
@@ -194,36 +260,41 @@ def create_class_assignment(
 ) -> ClassMatterAssignment:
     """
     Assign a teacher to teach a specific matter in this class.
-    
+
     Each class can have only one teacher per matter.
     """
     # Verify class exists
-    stmt = select(SchoolClass).where(SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id)
+    stmt = select(SchoolClass).where(
+        SchoolClass.id == class_id, SchoolClass.workspace_id == workspace.id
+    )
     school_class = db.scalars(stmt).first()
     if not school_class:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Class with id {class_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Class with id {class_id} not found"
         )
-    
+
     # Verify matter exists
-    stmt = select(Matter).where(Matter.id == assignment_data.matter_id, Matter.workspace_id == workspace.id)
+    stmt = select(Matter).where(
+        Matter.id == assignment_data.matter_id, Matter.workspace_id == workspace.id
+    )
     matter = db.scalars(stmt).first()
     if not matter:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Matter with id {assignment_data.matter_id} not found"
+            detail=f"Matter with id {assignment_data.matter_id} not found",
         )
-    
+
     # Verify teacher exists
-    stmt = select(Teacher).where(Teacher.id == assignment_data.teacher_id, Teacher.workspace_id == workspace.id)
+    stmt = select(Teacher).where(
+        Teacher.id == assignment_data.teacher_id, Teacher.workspace_id == workspace.id
+    )
     teacher = db.scalars(stmt).first()
     if not teacher:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Teacher with id {assignment_data.teacher_id} not found"
+            detail=f"Teacher with id {assignment_data.teacher_id} not found",
         )
-    
+
     # Check if matter is already assigned in this class
     stmt = select(ClassMatterAssignment).where(
         ClassMatterAssignment.class_id == class_id,
@@ -234,21 +305,21 @@ def create_class_assignment(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Matter {matter.name} is already assigned in this class"
+            detail=f"Matter {matter.name} is already assigned in this class",
         )
-    
+
     assignment = ClassMatterAssignment(
         workspace_id=workspace.id,
         class_id=class_id,
         matter_id=assignment_data.matter_id,
         teacher_id=assignment_data.teacher_id,
         hours_per_week=assignment_data.hours_per_week,
-        requirements=assignment_data.requirements
+        requirements=assignment_data.requirements,
     )
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
-    
+
     # Reload with relationships
     stmt = (
         select(ClassMatterAssignment)
@@ -288,26 +359,28 @@ def update_class_assignment(
     if not assignment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Assignment with id {assignment_id} not found in class {class_id}"
+            detail=f"Assignment with id {assignment_id} not found in class {class_id}",
         )
-    
+
     if assignment_data.teacher_id is not None:
         # Verify new teacher exists
-        stmt = select(Teacher).where(Teacher.id == assignment_data.teacher_id, Teacher.workspace_id == workspace.id)
+        stmt = select(Teacher).where(
+            Teacher.id == assignment_data.teacher_id, Teacher.workspace_id == workspace.id
+        )
         teacher = db.scalars(stmt).first()
         if not teacher:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Teacher with id {assignment_data.teacher_id} not found"
+                detail=f"Teacher with id {assignment_data.teacher_id} not found",
             )
         assignment.teacher_id = assignment_data.teacher_id
-    
+
     if assignment_data.hours_per_week is not None:
         assignment.hours_per_week = assignment_data.hours_per_week
 
     if assignment_data.requirements is not None:
         assignment.requirements = assignment_data.requirements
-    
+
     db.commit()
     db.refresh(assignment)
     return assignment
@@ -330,8 +403,8 @@ def delete_class_assignment(
     if not assignment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Assignment with id {assignment_id} not found in class {class_id}"
+            detail=f"Assignment with id {assignment_id} not found in class {class_id}",
         )
-    
+
     db.delete(assignment)
     db.commit()

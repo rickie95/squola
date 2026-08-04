@@ -11,13 +11,14 @@ import type {
 } from "../types";
 import { MatterRequirement, REQUIREMENT_LABELS } from "../types";
 import Modal from "../components/Modal";
+import ClassNameForm from "../components/ClassNameForm";
 
-const ROMAN_NUMERALS = ["I", "II", "III", "IV", "V"];
-const SECTIONS = ["A", "B", "C", "D", "E", "F"];
 
 export default function ClassesPage() {
   const queryClient = useQueryClient();
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
+  const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
+  const [cloningClassId, setCloningClassId] = useState<number | null>(null);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<SchoolClass | null>(null);
   const [selectedClass, setSelectedClass] = useState<SchoolClassWithAssignments | null>(null);
@@ -71,6 +72,15 @@ export default function ClassesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["classes"] });
       setSelectedClass(null);
+    },
+  });
+
+  const cloneClassMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: SchoolClassCreate }) =>
+      classesApi.clone(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["classes"] });
+      setIsCloneModalOpen(false);
     },
   });
 
@@ -130,6 +140,17 @@ export default function ClassesPage() {
     setClassFormData({ year: "I", section: "A" });
   };
 
+  const openCloneClassModal = (schoolClass: SchoolClass) => {
+    setCloningClassId(schoolClass.id);
+    setClassFormData({ year: "I", section: "A" });
+    setIsCloneModalOpen(true);
+  };
+
+  const closeCloneModal = () => {
+    setIsCloneModalOpen(false);
+    setCloningClassId(null);
+  };
+
   const openAssignmentModal = (matter?: Matter) => {
     setEditingAssignment(null);
     const defaultReqs = matter?.default_requirements || [];
@@ -169,12 +190,14 @@ export default function ClassesPage() {
     setSelectedClass(fullClass);
   };
 
-  const handleClassSubmit = (e: React.FormEvent) => {
+  const handleClassSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingClass) {
-      updateClassMutation.mutate({ id: editingClass.id, data: classFormData });
+      await updateClassMutation.mutateAsync({ id: editingClass.id, data: classFormData });
+    } else if (cloningClassId) {
+      await cloneClassMutation.mutateAsync({ id: cloningClassId, data: classFormData });
     } else {
-      createClassMutation.mutate(classFormData);
+      await createClassMutation.mutateAsync(classFormData);
     }
   };
 
@@ -289,6 +312,15 @@ export default function ClassesPage() {
                             Modifica
                           </button>
                           <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openCloneClassModal(schoolClass);
+                            }}
+                          >
+                            Clona
+                          </button>
+                          <button
                             className="btn btn-danger btn-sm"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -387,36 +419,7 @@ export default function ClassesPage() {
         title={editingClass ? "Modifica classe" : "Aggiungi una nuova classe"}
       >
         <form onSubmit={handleClassSubmit}>
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="year">Anno</label>
-              <select
-                id="year"
-                value={classFormData.year}
-                onChange={(e) => setClassFormData({ ...classFormData, year: e.target.value })}
-              >
-                {ROMAN_NUMERALS.map((numeral) => (
-                  <option key={numeral} value={numeral}>
-                    {numeral}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label htmlFor="section">Sezione</label>
-              <select
-                id="section"
-                value={classFormData.section}
-                onChange={(e) => setClassFormData({ ...classFormData, section: e.target.value })}
-              >
-                {SECTIONS.map((section) => (
-                  <option key={section} value={section}>
-                    {section}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          <ClassNameForm value={classFormData} onChange={setClassFormData} />
           <div style={{ marginTop: "1rem", padding: "1rem", backgroundColor: "var(--background-color)", borderRadius: "0.5rem" }}>
             <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
               Il nome della classe sarà: <strong>{classFormData.year}{classFormData.section}</strong>
@@ -432,6 +435,36 @@ export default function ClassesPage() {
               disabled={createClassMutation.isPending || updateClassMutation.isPending}
             >
               {editingClass ? "Aggiorna" : "Crea"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={isCloneModalOpen}
+        onClose={closeCloneModal}
+        title="Clona classe"
+      >
+        <form onSubmit={handleClassSubmit}>
+          <p style={{ marginBottom: "1rem", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+            Scegli il nome per la nuova classe clonato. Tutte le assegnazioni delle materie verranno duplicate.
+          </p>
+          <ClassNameForm value={classFormData} onChange={setClassFormData} />
+          <div style={{ marginTop: "1rem", padding: "1rem", backgroundColor: "var(--background-color)", borderRadius: "0.5rem" }}>
+            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+              Il nome della classe sarà: <strong>{classFormData.year}{classFormData.section}</strong>
+            </p>
+          </div>
+          <div className="form-actions">
+            <button type="button" className="btn btn-secondary" onClick={closeCloneModal}>
+              Annulla
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={cloneClassMutation.isPending}
+            >
+              Conferma Clona
             </button>
           </div>
         </form>
