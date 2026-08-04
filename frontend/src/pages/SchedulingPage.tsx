@@ -18,6 +18,7 @@ const HOUR_ORDER = [
   "10:00-11:00",
   "11:00-12:00",
   "12:00-13:00",
+  "13:00-14:00"
 ];
 
 const sortByDayThenHour = (a: ScheduleSlot, b: ScheduleSlot) =>
