@@ -600,7 +600,6 @@ export default function SchedulingPage() {
                   <tr>
                     <th>Giorno</th>
                     <th>Ora</th>
-                    {viewMode === "by_class" && <th>Insegnante</th>}
                     {viewMode === "by_teacher" && <th>Classe</th>}
                     <th>Materie</th>
                   </tr>
@@ -612,7 +611,6 @@ export default function SchedulingPage() {
                       <tr key={`${slot.day}-${slot.hour}-${slot.matter}`}>
                         <td>{slot.day}</td>
                         <td>{slot.hour}</td>
-                        {viewMode === "by_class" && <td>{slot.teacher}</td>}
                         {viewMode === "by_teacher" && <td>{slot.class}</td>}
                         <td>{slot.matter}</td>
                       </tr>
