@@ -24,6 +24,43 @@ const sortByDayThenHour = (a: ScheduleSlot, b: ScheduleSlot) =>
   DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day) ||
   HOUR_ORDER.indexOf(a.hour) - HOUR_ORDER.indexOf(b.hour);
 
+const DAY_INDEX_TO_LABEL = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì"];
+const DAY_LABEL_TO_INDEX: Record<string, number> = DAY_INDEX_TO_LABEL.reduce(
+  (acc, label, index) => {
+    acc[label.toLowerCase()] = index;
+    return acc;
+  },
+  {} as Record<string, number>
+);
+
+const normalizeDayLabel = (day: string): string => {
+  const trimmed = day.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (DAY_LABEL_TO_INDEX[lower] !== undefined) {
+    return DAY_INDEX_TO_LABEL[DAY_LABEL_TO_INDEX[lower]];
+  }
+
+  const englishToIndex: Record<string, number> = {
+    monday: 0,
+    tuesday: 1,
+    wednesday: 2,
+    thursday: 3,
+    friday: 4,
+  };
+
+  if (englishToIndex[lower] !== undefined) {
+    return DAY_INDEX_TO_LABEL[englishToIndex[lower]];
+  }
+
+  const numeric = Number(trimmed);
+  if (!Number.isNaN(numeric) && numeric >= 0 && numeric < DAY_INDEX_TO_LABEL.length) {
+    return DAY_INDEX_TO_LABEL[numeric];
+  }
+
+  return trimmed;
+};
+
 export default function SchedulingPage() {
   const [tabMode, setTabMode] = useState<TabMode>("generate");
   const [preview, setPreview] = useState<SchedulingPreview | null>(null);
@@ -480,6 +517,69 @@ export default function SchedulingPage() {
               )}
             </div>
           ))}
+        </div>
+      );
+    }
+
+    if (viewMode === "by_class") {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          {Object.entries(scheduleData)
+            .sort(([a], [b]) => a.localeCompare(b, "it"))
+            .map(([className, slots]) => {
+              const slotMap = new Map(
+                slots.map((slot) => [`${normalizeDayLabel(slot.day)}|${slot.hour}`, slot] as const)
+              );
+
+              return (
+                <div key={className}>
+                  <h4 style={{ marginBottom: "0.75rem", color: "var(--primary-color)" }}>
+                    {className}
+                  </h4>
+                  <div className="table-container">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Ora</th>
+                          {DAY_ORDER.map((day) => (
+                            <th key={day}>{day}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {HOUR_ORDER.map((hour) => (
+                          <tr key={hour}>
+                            <td>{hour}</td>
+                            {DAY_ORDER.map((day) => {
+                              const slot = slotMap.get(`${day}|${hour}`);
+                              return (
+                                <td key={`${day}-${hour}`}>
+                                  {slot ? (
+                                    <>
+                                      <div>{slot.matter}</div>
+                                      <div
+                                        style={{
+                                          fontSize: "0.85em",
+                                          color: "var(--text-secondary)",
+                                        }}
+                                      >
+                                        {slot.teacher}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
         </div>
       );
     }
