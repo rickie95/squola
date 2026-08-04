@@ -20,6 +20,10 @@ const HOUR_ORDER = [
   "12:00-13:00",
 ];
 
+const sortByDayThenHour = (a: ScheduleSlot, b: ScheduleSlot) =>
+  DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day) ||
+  HOUR_ORDER.indexOf(a.hour) - HOUR_ORDER.indexOf(b.hour);
+
 export default function SchedulingPage() {
   const [tabMode, setTabMode] = useState<TabMode>("generate");
   const [preview, setPreview] = useState<SchedulingPreview | null>(null);
@@ -482,7 +486,9 @@ export default function SchedulingPage() {
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-        {Object.entries(scheduleData).map(([key, slots]) => (
+        {Object.entries(scheduleData)
+          .sort(([a], [b]) => a.localeCompare(b, "it"))
+          .map(([key, slots]) => (
           <div key={key}>
             <h4 style={{ marginBottom: "0.75rem", color: "var(--primary-color)" }}>
               {key}
@@ -500,11 +506,7 @@ export default function SchedulingPage() {
                 </thead>
                 <tbody>
                   {[...slots]
-                    .sort(
-                      (a: ScheduleSlot, b: ScheduleSlot) =>
-                        DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day) ||
-                        HOUR_ORDER.indexOf(a.hour) - HOUR_ORDER.indexOf(b.hour)
-                    )
+                    .sort(sortByDayThenHour)
                     .map((slot: ScheduleSlot) => (
                       <tr key={`${slot.day}-${slot.hour}-${slot.matter}`}>
                         <td>{slot.day}</td>
