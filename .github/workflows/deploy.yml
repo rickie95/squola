@@ -14,5 +14,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Backup database
+        run: |
+          sudo mkdir -p /var/squola/db
+          if [ -f ./db/squola.db ]; then
+            sudo cp ./db/squola.db /var/squola/db/$(date +%Y-%m-%d_%H-%M).db
+            echo "Database backed up successfully."
+          else
+            echo "No database file found at ./db/squola.db, skipping backup."
+          fi
+
       - name: Deploy stack
         run: docker compose up --build --detach
