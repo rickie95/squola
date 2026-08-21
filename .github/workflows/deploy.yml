@@ -16,9 +16,9 @@ jobs:
 
       - name: Backup database
         run: |
-          sudo mkdir -p /var/squola/db
+          mkdir -p ~/squolabk/
           if [ -f ./db/squola.db ]; then
-            sudo cp ./db/squola.db /var/squola/db/$(date +%Y-%m-%d_%H-%M).db
+            sudo cp ./db/squola.db ~/squolabk/$(date +%Y-%m-%d_%H-%M).db
             echo "Database backed up successfully."
           else
             echo "No database file found at ./db/squola.db, skipping backup."
