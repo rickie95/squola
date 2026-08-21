@@ -8,7 +8,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: raspberrypi
+    runs-on: default
 
     steps:
       - name: Checkout repository
