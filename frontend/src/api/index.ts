@@ -163,6 +163,10 @@ export const classesApi = {
     return response.data;
   },
 
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/classes/${id}`);
+  },
+
   // Matter assignments
   listAssignments: async (classId: number): Promise<ClassMatterAssignment[]> => {
     const response = await api.get<ClassMatterAssignment[]>(
