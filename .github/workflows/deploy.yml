@@ -17,11 +17,11 @@ jobs:
       - name: Backup database
         run: |
           mkdir -p ~/squolabk/
-          if [ -f ./db/squola.db ]; then
-            cp ./db/squola.db ~/squolabk/$(date +%Y-%m-%d_%H-%M).db
+          if [ -f ~/squolabk/current.db]; then
+            cp ~/squolabk/current.db ~/squolabk/$(date +%Y-%m-%d_%H-%M).db
             echo "Database backed up successfully."
           else
-            echo "No database file found at ./db/squola.db, skipping backup."
+            echo "No database file found at ~/squolabk/current.db, skipping backup."
           fi
 
       - name: Deploy stack
