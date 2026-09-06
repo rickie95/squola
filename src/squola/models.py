@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Optional
 
 from sqlalchemy import (
+    Boolean,
     JSON,
     Column,
     DateTime,
@@ -159,6 +160,9 @@ class Teacher(Base):
     last_name: Mapped[str] = mapped_column(String(100))
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     schedule_preference: Mapped[str] = mapped_column(String(50), default=SchedulePreference.NONE.value)
+    prefers_day_off: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
 
     workspace: Mapped["Workspace"] = relationship(back_populates="teachers")
     matters: Mapped[list["Matter"]] = relationship(

@@ -82,6 +82,7 @@ def create_teacher(
         last_name=teacher_data.last_name,
         email=teacher_data.email,
         schedule_preference=teacher_data.schedule_preference.value,
+        prefers_day_off=teacher_data.prefers_day_off,
         matters=matters,
     )
     db.add(teacher)
@@ -119,6 +120,8 @@ def update_teacher(
         teacher.email = teacher_data.email
     if teacher_data.schedule_preference is not None:
         teacher.schedule_preference = teacher_data.schedule_preference.value
+    if teacher_data.prefers_day_off is not None:
+        teacher.prefers_day_off = teacher_data.prefers_day_off
     
     # Update matters if provided
     if teacher_data.matter_ids is not None:

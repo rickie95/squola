@@ -204,6 +204,9 @@ def preview_scheduling_data(
             "total_hours_to_schedule": total_hours,
             "total_slots_available": total_slots_available,
             "unavailabilities_count": len(data.unavailabilities),
+            "flexible_day_off_requests_count": sum(
+                teacher.prefers_day_off for teacher in data.teachers
+            ),
         },
         "teachers": [
             {
@@ -212,6 +215,7 @@ def preview_scheduling_data(
                 "hours_assigned": teacher_hours.get(t.id, 0),
                 "unavailabilities_count": unavail_counts.get(t.id, 0),
                 "preference": t.schedule_preference,
+                "prefers_day_off": t.prefers_day_off,
             }
             for t in data.teachers
         ],

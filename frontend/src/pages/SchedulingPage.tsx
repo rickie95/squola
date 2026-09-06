@@ -225,6 +225,12 @@ export default function SchedulingPage() {
             </div>
             <div className="stat-label">Slot disponibili</div>
           </div>
+          <div className="stat-card">
+            <div className="stat-value">
+              {preview.summary.flexible_day_off_requests_count}
+            </div>
+            <div className="stat-label">Richieste giorno libero</div>
+          </div>
         </div>
 
         {preview.issues.length > 0 && (

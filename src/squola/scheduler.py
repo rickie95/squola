@@ -230,6 +230,7 @@ class ScheduleGenerator:
         # Decision variables: x[assignment_id, day, hour] = 1 if assignment is scheduled
         # at that day and hour
         self.x: dict[tuple[int, int, int], cp_model.IntVar] = {}
+        self.day_off_violations: list[cp_model.IntVar] = []
 
         # Build reverse lookups for constraints
         self._build_lookups()
@@ -451,7 +452,7 @@ class ScheduleGenerator:
 
         Preferences are added as objectives to optimize, not hard constraints.
         """
-        objective_terms = []
+        preference_terms: list[tuple[int, cp_model.IntVar]] = []
 
         for teacher in self.data.teachers:
             if teacher.id not in self.assignments_by_teacher:
@@ -466,7 +467,7 @@ class ScheduleGenerator:
                     for day in range(DAYS_OF_WEEK):
                         for hour in range(1, HOURS_PER_DAY + 1):
                             # Higher penalty for later hours
-                            objective_terms.append(hour * self.x[(assignment.id, day, hour)])
+                            preference_terms.append((hour, self.x[(assignment.id, day, hour)]))
 
             elif preference == SchedulePreference.LATE.value:
                 # Prefer late hours: minimize (max_hour - hour) * scheduled
@@ -474,24 +475,37 @@ class ScheduleGenerator:
                     for day in range(DAYS_OF_WEEK):
                         for hour in range(1, HOURS_PER_DAY + 1):
                             # Higher penalty for earlier hours
-                            objective_terms.append(
-                                (HOURS_PER_DAY + 1 - hour) * self.x[(assignment.id, day, hour)]
+                            preference_terms.append(
+                                (HOURS_PER_DAY + 1 - hour, self.x[(assignment.id, day, hour)])
                             )
 
             elif preference == SchedulePreference.MINIMIZE_GAPS.value:
                 # Minimize gaps: use auxiliary variables to track gaps
                 # Simplified: prefer consecutive hours by penalizing spread
-                self._add_minimize_gaps_for_teacher(teacher.id, assignments, objective_terms)
+                self._add_minimize_gaps_for_teacher(teacher.id, assignments, preference_terms)
 
             elif preference == SchedulePreference.MAXIMIZE_GAPS.value:
                 # Maximize gaps: opposite of minimize gaps
-                self._add_maximize_gaps_for_teacher(teacher.id, assignments, objective_terms)
+                self._add_maximize_gaps_for_teacher(teacher.id, assignments, preference_terms)
+
+        preference_upper_bound = sum(coefficient for coefficient, _ in preference_terms)
+        objective_terms = [
+            coefficient * variable for coefficient, variable in preference_terms
+        ]
+        if self.day_off_violations:
+            day_off_weight = preference_upper_bound + 1
+            objective_terms.extend(
+                day_off_weight * violation for violation in self.day_off_violations
+            )
 
         if objective_terms:
             self.model.minimize(sum(objective_terms))
 
     def _add_minimize_gaps_for_teacher(
-        self, teacher_id: int, assignments: list[ClassMatterAssignment], objective_terms: list
+        self,
+        teacher_id: int,
+        assignments: list[ClassMatterAssignment],
+        objective_terms: list[tuple[int, cp_model.IntVar]],
     ) -> None:
         """Add gap minimization for a teacher (group lessons together)."""
         for day in range(DAYS_OF_WEEK):
@@ -499,10 +513,13 @@ class ScheduleGenerator:
             for hour in range(1, HOURS_PER_DAY + 1):
                 for assignment in assignments:
                     # Penalty increases with distance from first hour
-                    objective_terms.append((hour - 1) * self.x[(assignment.id, day, hour)])
+                    objective_terms.append((hour - 1, self.x[(assignment.id, day, hour)]))
 
     def _add_maximize_gaps_for_teacher(
-        self, teacher_id: int, assignments: list[ClassMatterAssignment], objective_terms: list
+        self,
+        teacher_id: int,
+        assignments: list[ClassMatterAssignment],
+        objective_terms: list[tuple[int, cp_model.IntVar]],
     ) -> None:
         """Add gap maximization for a teacher (spread lessons out)."""
         for day in range(DAYS_OF_WEEK):
@@ -514,7 +531,27 @@ class ScheduleGenerator:
                     distance_from_middle = abs(hour - middle)
                     # Invert: penalize being close to middle (coefficient must be computed first)
                     coefficient = int(middle - distance_from_middle)
-                    objective_terms.append(coefficient * self.x[(assignment.id, day, hour)])
+                    objective_terms.append((coefficient, self.x[(assignment.id, day, hour)]))
+
+    def _add_flexible_day_off_preferences(self) -> None:
+        """Prefer leaving one solver-selected weekday free for opted-in teachers."""
+        for teacher in self.data.teachers:
+            if not teacher.prefers_day_off or teacher.id not in self.assignments_by_teacher:
+                continue
+
+            assignments = self.assignments_by_teacher[teacher.id]
+            works_on_day = [
+                self.model.new_bool_var(f"teacher_{teacher.id}_works_day_{day}")
+                for day in range(DAYS_OF_WEEK)
+            ]
+            for day, works in enumerate(works_on_day):
+                for assignment in assignments:
+                    for hour in range(1, HOURS_PER_DAY + 1):
+                        self.model.add(self.x[(assignment.id, day, hour)] <= works)
+
+            violation = self.model.new_bool_var(f"teacher_{teacher.id}_day_off_violation")
+            self.model.add(sum(works_on_day) <= DAYS_OF_WEEK - 1 + violation)
+            self.day_off_violations.append(violation)
 
     def build_model(self) -> None:
         """Build the complete CP model with all variables and constraints."""
@@ -534,6 +571,7 @@ class ScheduleGenerator:
         self._add_at_least_one_lesson_of_two_hours_per_week_constraint()
 
         # Soft constraints (objectives)
+        self._add_flexible_day_off_preferences()
         self._add_preference_objectives()
 
     def solve(self, time_limit_seconds: float = 60.0) -> GeneratedSchedule:
