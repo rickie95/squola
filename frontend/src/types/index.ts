@@ -68,6 +68,7 @@ export interface Teacher {
   last_name: string;
   email: string | null;
   schedule_preference: SchedulePreference;
+  prefers_day_off: boolean;
 }
 
 export interface TeacherWithMatters extends Teacher {
@@ -80,6 +81,7 @@ export interface TeacherCreate {
   last_name: string;
   email?: string | null;
   schedule_preference?: SchedulePreference;
+  prefers_day_off?: boolean;
   matter_ids?: number[];
 }
 
@@ -88,6 +90,7 @@ export interface TeacherUpdate {
   last_name?: string;
   email?: string | null;
   schedule_preference?: SchedulePreference;
+  prefers_day_off?: boolean;
   matter_ids?: number[];
 }
 
@@ -177,6 +180,7 @@ export interface SchedulingPreviewTeacher {
   hours_assigned: number;
   unavailabilities_count: number;
   preference: string;
+  prefers_day_off: boolean;
 }
 
 export interface SchedulingPreviewClass {
@@ -194,6 +198,7 @@ export interface SchedulingPreview {
     total_hours_to_schedule: number;
     total_slots_available: number;
     unavailabilities_count: number;
+    flexible_day_off_requests_count: number;
   };
   teachers: SchedulingPreviewTeacher[];
   classes: SchedulingPreviewClass[];

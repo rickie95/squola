@@ -118,6 +118,7 @@ class TeacherBase(BaseModel):
     last_name: str = Field(..., min_length=1, max_length=100)
     email: str | None = Field(None, max_length=255)
     schedule_preference: SchedulePreference = SchedulePreference.NONE
+    prefers_day_off: bool = False
 
 
 class TeacherCreate(TeacherBase):
@@ -131,6 +132,7 @@ class TeacherUpdate(BaseModel):
     last_name: str | None = Field(None, min_length=1, max_length=100)
     email: str | None = Field(None, max_length=255)
     schedule_preference: SchedulePreference | None = None
+    prefers_day_off: bool | None = None
     matter_ids: list[int] | None = Field(None, description="IDs of matters this teacher can teach")
 
 

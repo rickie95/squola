@@ -67,7 +67,19 @@ A teacher can be marked as unavailable for specific time slots — e.g., hours t
 uv run squola
 
 # Frontend
-cd frontend && npm install && npm run dev
+cd frontend && npm install && VITE_API_URL=http://localhost:8000/api npm run dev
 ```
 
 Backend runs on `http://localhost:8000`, frontend on `http://localhost:5173`. API docs at `http://localhost:8000/docs`.
+
+## Resetting a password
+
+To reset an account password directly from the local database, run the helper from
+the repository:
+
+```bash
+uv run python helpers/reset_password.py <username>
+```
+
+The helper prompts for and confirms a password with at least 12 characters, then
+revokes the user's active sessions.

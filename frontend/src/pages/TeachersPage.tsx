@@ -23,6 +23,7 @@ export default function TeachersPage() {
     last_name: "",
     email: "",
     schedule_preference: "none" as SchedulePreference,
+    prefers_day_off: false,
     matter_ids: [],
   });
 
@@ -67,6 +68,7 @@ export default function TeachersPage() {
       last_name: "",
       email: "",
       schedule_preference: "none" as SchedulePreference,
+      prefers_day_off: false,
       matter_ids: [],
     });
     setIsModalOpen(true);
@@ -81,6 +83,7 @@ export default function TeachersPage() {
       last_name: fullTeacher.last_name,
       email: fullTeacher.email || "",
       schedule_preference: fullTeacher.schedule_preference,
+      prefers_day_off: fullTeacher.prefers_day_off,
       matter_ids: fullTeacher.matters.map((m) => m.id),
     });
     setIsModalOpen(true);
@@ -94,6 +97,7 @@ export default function TeachersPage() {
       last_name: "",
       email: "",
       schedule_preference: "none" as SchedulePreference,
+      prefers_day_off: false,
       matter_ids: [],
     });
   };
@@ -234,6 +238,21 @@ export default function TeachersPage() {
                 required
               />
             </div>
+          </div>
+
+          <div className="form-group">
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                checked={formData.prefers_day_off || false}
+                onChange={(e) => setFormData({ ...formData, prefers_day_off: e.target.checked })}
+              />
+              Richiedi un giorno libero flessibile
+            </label>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+              Il generatore sceglie il giorno e prova a rispettare la richiesta senza
+              compromettere la fattibilità dell'orario.
+            </p>
           </div>
 
           <div className="form-group">

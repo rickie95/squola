@@ -10,3 +10,4 @@
 8. a teacher might express a preference to work in the first hours or in the latest hours of the schedule
 9. a teacher might express a preference to minimize gaps, resulting in more lessons grouped
 10. a teacher might express a preference to maximize gaps, resulting in more free time between lessons
+11. a teacher can request an unspecified flexible day off; this request is disabled by default, and the solver chooses the day when feasible

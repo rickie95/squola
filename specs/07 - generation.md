@@ -46,6 +46,7 @@ Teacher preferences are used as optimization objectives:
 2. **LATE**: Prefer scheduling lessons in later hours
 3. **MINIMIZE_GAPS**: Group lessons together, minimize free periods between lessons
 4. **MAXIMIZE_GAPS**: Spread lessons out, maximize free periods between lessons
+5. **Flexible day off**: For teachers who request it, prefer leaving one solver-selected weekday completely free. This is prioritized over the other soft preferences and is relaxed when required to produce a valid schedule.
 
 ## Model Variables
 
