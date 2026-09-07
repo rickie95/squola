@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { authApi } from "../api";
+import { getApiErrorMessage } from "../api/errors";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -17,8 +18,8 @@ export default function RegisterPage() {
       await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
       navigate("/", { replace: true });
     },
-    onError: (err: any) => {
-      setError(err?.response?.data?.detail || "Registrazione non riuscita");
+    onError: (error: unknown) => {
+      setError(getApiErrorMessage(error, "Registrazione non riuscita"));
     },
   });
 
@@ -87,4 +88,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-

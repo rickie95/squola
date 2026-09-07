@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "./AuthProvider";
+import { useAuth } from "./AuthContext";
 
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isLoading, isAuthenticated } = useAuth();
@@ -13,4 +13,3 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
   }
   return <>{children}</>;
 }
-

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { schedulingApi } from "../api";
+import { getApiErrorMessage } from "../api/errors";
 import type {
   GeneratedSchedule,
   SchedulingPreview,
@@ -179,8 +180,8 @@ export default function SchedulingPage() {
     try {
       const data = await schedulingApi.preview();
       setPreview(data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to load scheduling data");
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, "Failed to load scheduling data"));
     } finally {
       setLoading(false);
     }
@@ -190,8 +191,8 @@ export default function SchedulingPage() {
     try {
       const data = await schedulingApi.listSaved();
       setSavedSchedules(data);
-    } catch (err: any) {
-      console.error("Failed to fetch saved schedules", err);
+    } catch (error: unknown) {
+      console.error("Failed to fetch saved schedules", error);
     }
   };
 
@@ -206,8 +207,8 @@ export default function SchedulingPage() {
       setSchedule(data);
       setNickname("");
       fetchSavedSchedules(); // Refresh the list
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Errore durante la generazione dell'orario");
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, "Errore durante la generazione dell'orario"));
     } finally {
       setGenerating(false);
     }
@@ -217,8 +218,8 @@ export default function SchedulingPage() {
     try {
       const data = await schedulingApi.getSaved(id);
       setSelectedSavedSchedule(data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Errore durante il caricamento dell'orario");
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, "Errore durante il caricamento dell'orario"));
     }
   };
 
@@ -230,8 +231,8 @@ export default function SchedulingPage() {
       if (selectedSavedSchedule?.id === id) {
         setSelectedSavedSchedule(null);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Errore durante la cancellazione dell'orario");
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, "Errore durante la cancellazione dell'orario"));
     }
   };
 
@@ -241,8 +242,8 @@ export default function SchedulingPage() {
       setEditingNickname(null);
       setNewNickname("");
       fetchSavedSchedules();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to update nickname");
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, "Failed to update nickname"));
     }
   };
 
