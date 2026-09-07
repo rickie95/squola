@@ -557,3 +557,116 @@ tr:hover {
   height: 1rem;
   accent-color: var(--primary-color);
 }
+
+/* Timetable grids share the same structure for classes and teachers. */
+.timetable-grid-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.timetable-grid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.timetable-grid-header h4 {
+  color: var(--primary-color);
+}
+
+.timetable-slot-secondary {
+  color: var(--text-secondary);
+  font-size: 0.85em;
+}
+
+.print-document {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-document,
+  .print-document * {
+    visibility: visible;
+  }
+
+  .print-document {
+    display: block;
+    left: 0;
+    position: absolute;
+    top: 0;
+    width: 100%;
+  }
+
+  .print-timetable-page {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-timetable-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .print-timetable-header {
+    align-items: flex-end;
+    border-bottom: 1px solid #111827;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5mm;
+    padding-bottom: 3mm;
+  }
+
+  .print-timetable-header h1 {
+    font-size: 18pt;
+  }
+
+  .print-timetable-header p {
+    font-size: 10pt;
+  }
+
+  .print-document .timetable-grid-header {
+    margin-bottom: 4mm;
+  }
+
+  .print-document .timetable-grid-header h4 {
+    color: #111827;
+    font-size: 14pt;
+  }
+
+  .print-document .data-table {
+    table-layout: fixed;
+  }
+
+  .print-document th,
+  .print-document td {
+    border: 1px solid #9ca3af;
+    font-size: 9pt;
+    padding: 3mm;
+    vertical-align: top;
+  }
+
+  .print-document thead {
+    display: table-header-group;
+  }
+
+  .print-document tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-document .timetable-slot-secondary {
+    color: #374151;
+  }
+}

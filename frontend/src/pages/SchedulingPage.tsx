@@ -10,6 +10,15 @@ import type {
 
 type ViewMode = "by_class" | "by_teacher" | "by_day";
 type TabMode = "generate" | "history";
+type GridViewMode = Exclude<ViewMode, "by_day">;
+type TimetableEntry = [string, ScheduleSlot[]];
+
+interface PrintDocument {
+  scheduleName: string;
+  createdAt: string;
+  grouping: GridViewMode;
+  entries: TimetableEntry[];
+}
 
 const DAY_ORDER = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì"];
 const HOUR_ORDER = [
@@ -62,6 +71,74 @@ const normalizeDayLabel = (day: string): string => {
   return trimmed;
 };
 
+interface WeeklyTimetableGridProps {
+  recipientName: string;
+  slots: ScheduleSlot[];
+  grouping: GridViewMode;
+  onPrint?: () => void;
+}
+
+function WeeklyTimetableGrid({
+  recipientName,
+  slots,
+  grouping,
+  onPrint,
+}: WeeklyTimetableGridProps) {
+  const slotMap = new Map(
+    slots.map((slot) => [`${normalizeDayLabel(slot.day)}|${slot.hour}`, slot] as const)
+  );
+  const secondaryLabel = grouping === "by_class" ? "teacher" : "class";
+
+  return (
+    <section className="timetable-grid">
+      <div className="timetable-grid-header">
+        <h4>{recipientName}</h4>
+        {onPrint && (
+          <button className="btn btn-secondary btn-sm" onClick={onPrint}>
+            Stampa / Salva PDF
+          </button>
+        )}
+      </div>
+      <div className="table-container">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Ora</th>
+              {DAY_ORDER.map((day) => (
+                <th key={day}>{day}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {HOUR_ORDER.map((hour) => (
+              <tr key={hour}>
+                <td>{hour}</td>
+                {DAY_ORDER.map((day) => {
+                  const slot = slotMap.get(`${day}|${hour}`);
+                  return (
+                    <td key={`${day}-${hour}`} className="timetable-slot">
+                      {slot ? (
+                        <>
+                          <div>{slot.matter}</div>
+                          <div className="timetable-slot-secondary">
+                            {slot[secondaryLabel]}
+                          </div>
+                        </>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export default function SchedulingPage() {
   const [tabMode, setTabMode] = useState<TabMode>("generate");
   const [preview, setPreview] = useState<SchedulingPreview | null>(null);
@@ -76,11 +153,25 @@ export default function SchedulingPage() {
   const [nickname, setNickname] = useState("");
   const [editingNickname, setEditingNickname] = useState<number | null>(null);
   const [newNickname, setNewNickname] = useState("");
+  const [printDocument, setPrintDocument] = useState<PrintDocument | null>(null);
 
   useEffect(() => {
     fetchPreview();
     fetchSavedSchedules();
   }, []);
+
+  useEffect(() => {
+    if (!printDocument) return;
+
+    const printTimeout = window.setTimeout(() => window.print(), 0);
+    const clearPrintDocument = () => setPrintDocument(null);
+
+    window.addEventListener("afterprint", clearPrintDocument);
+    return () => {
+      window.clearTimeout(printTimeout);
+      window.removeEventListener("afterprint", clearPrintDocument);
+    };
+  }, [printDocument]);
 
   const fetchPreview = async () => {
     setLoading(true);
@@ -180,6 +271,20 @@ export default function SchedulingPage() {
     a.download = `schedule_${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const printTimetables = (
+    scheduleName: string,
+    createdAt: string,
+    grouping: GridViewMode,
+    entries: TimetableEntry[]
+  ) => {
+    setPrintDocument({
+      scheduleName,
+      createdAt,
+      grouping,
+      entries: [...entries].sort(([a], [b]) => a.localeCompare(b, "it")),
+    });
   };
 
   const renderPreview = () => {
@@ -412,6 +517,7 @@ export default function SchedulingPage() {
     if (!selectedSavedSchedule) return null;
 
     const scheduleData = selectedSavedSchedule.schedule_data[viewMode];
+    const scheduleName = selectedSavedSchedule.nickname || selectedSavedSchedule.name;
 
     return (
       <div className="card">
@@ -425,7 +531,7 @@ export default function SchedulingPage() {
         >
           <div>
             <h3>
-              {selectedSavedSchedule.nickname || selectedSavedSchedule.name}
+              {scheduleName}
             </h3>
             <p
               style={{
@@ -443,6 +549,21 @@ export default function SchedulingPage() {
             <button className="btn btn-secondary" onClick={downloadSchedule}>
               Scarica JSON
             </button>
+            {viewMode !== "by_day" && (
+              <button
+                className="btn btn-secondary"
+                onClick={() =>
+                  printTimetables(
+                    scheduleName,
+                    selectedSavedSchedule.created_at,
+                    viewMode,
+                    Object.entries(selectedSavedSchedule.schedule_data[viewMode])
+                  )
+                }
+              >
+                Stampa tutti / Salva PDF
+              </button>
+            )}
             <button
               className="btn btn-secondary"
               onClick={() => setSelectedSavedSchedule(null)}
@@ -528,65 +649,35 @@ export default function SchedulingPage() {
       );
     }
 
-    if (viewMode === "by_class") {
+    if (viewMode === "by_class" || viewMode === "by_teacher") {
+      const grouping = viewMode;
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <div className="timetable-grid-list">
           {Object.entries(scheduleData)
             .sort(([a], [b]) => a.localeCompare(b, "it"))
-            .map(([className, slots]) => {
-              const slotMap = new Map(
-                slots.map((slot) => [`${normalizeDayLabel(slot.day)}|${slot.hour}`, slot] as const)
-              );
+            .map(([recipientName, slots]) => (
+              <WeeklyTimetableGrid
+                key={recipientName}
+                recipientName={recipientName}
+                slots={slots}
+                grouping={grouping}
+                onPrint={() => {
+                  const scheduleToPrint = tabMode === "generate" ? schedule : selectedSavedSchedule;
+                  if (!scheduleToPrint) return;
 
-              return (
-                <div key={className}>
-                  <h4 style={{ marginBottom: "0.75rem", color: "var(--primary-color)" }}>
-                    {className}
-                  </h4>
-                  <div className="table-container">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Ora</th>
-                          {DAY_ORDER.map((day) => (
-                            <th key={day}>{day}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {HOUR_ORDER.map((hour) => (
-                          <tr key={hour}>
-                            <td>{hour}</td>
-                            {DAY_ORDER.map((day) => {
-                              const slot = slotMap.get(`${day}|${hour}`);
-                              return (
-                                <td key={`${day}-${hour}`}>
-                                  {slot ? (
-                                    <>
-                                      <div>{slot.matter}</div>
-                                      <div
-                                        style={{
-                                          fontSize: "0.85em",
-                                          color: "var(--text-secondary)",
-                                        }}
-                                      >
-                                        {slot.teacher}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    "-"
-                                  )}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })}
+                  printTimetables(
+                    tabMode === "generate"
+                      ? "Orario generato"
+                      : selectedSavedSchedule!.nickname || selectedSavedSchedule!.name,
+                    tabMode === "generate"
+                      ? schedule!.metadata.generated_at
+                      : selectedSavedSchedule!.created_at,
+                    grouping,
+                    [[recipientName, slots]]
+                  );
+                }}
+              />
+            ))}
         </div>
       );
     }
@@ -659,9 +750,26 @@ export default function SchedulingPage() {
               {schedule.metadata.total_slots} slots
             </p>
           </div>
-          <button className="btn btn-secondary" onClick={downloadSchedule}>
-            Scarica JSON
-          </button>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <button className="btn btn-secondary" onClick={downloadSchedule}>
+              Scarica JSON
+            </button>
+            {viewMode !== "by_day" && (
+              <button
+                className="btn btn-secondary"
+                onClick={() =>
+                  printTimetables(
+                    "Orario generato",
+                    schedule.metadata.generated_at,
+                    viewMode,
+                    Object.entries(schedule.schedule[viewMode])
+                  )
+                }
+              >
+                Stampa tutti / Salva PDF
+              </button>
+            )}
+          </div>
         </div>
 
         <div style={{ marginBottom: "1rem" }}>
@@ -753,6 +861,30 @@ export default function SchedulingPage() {
             </>
           )}
         </>
+      )}
+
+      {printDocument && (
+        <section className="print-document">
+          {printDocument.entries.map(([recipientName, slots]) => (
+            <article className="print-timetable-page" key={recipientName}>
+              <header className="print-timetable-header">
+                <div>
+                  <h1>{printDocument.scheduleName}</h1>
+                  <p>
+                    {printDocument.grouping === "by_class" ? "Classe" : "Insegnante"}:{" "}
+                    <strong>{recipientName}</strong>
+                  </p>
+                </div>
+                <p>Creato il: {new Date(printDocument.createdAt).toLocaleString("it-IT")}</p>
+              </header>
+              <WeeklyTimetableGrid
+                recipientName={recipientName}
+                slots={slots}
+                grouping={printDocument.grouping}
+              />
+            </article>
+          ))}
+        </section>
       )}
     </div>
   );
