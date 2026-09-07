@@ -545,10 +545,12 @@ class ScheduleGenerator:
                 for day in range(DAYS_OF_WEEK)
             ]
             for day, works in enumerate(works_on_day):
-                for assignment in assignments:
-                    for hour in range(1, HOURS_PER_DAY + 1):
-                        self.model.add(self.x[(assignment.id, day, hour)] <= works)
-
+                day_vars = [
+                    self.x[(assignment.id, day, hour)]
+                    for assignment in assignments
+                    for hour in range(1, HOURS_PER_DAY + 1)
+                ]
+                self.model.add(sum(day_vars) <= len(day_vars) * works)
             violation = self.model.new_bool_var(f"teacher_{teacher.id}_day_off_violation")
             self.model.add(sum(works_on_day) <= DAYS_OF_WEEK - 1 + violation)
             self.day_off_violations.append(violation)
