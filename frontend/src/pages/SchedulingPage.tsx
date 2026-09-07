@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { schedulingApi } from "../api";
 import { getApiErrorMessage } from "../api/errors";
 import type {
@@ -15,8 +16,6 @@ type GridViewMode = Exclude<ViewMode, "by_day">;
 type TimetableEntry = [string, ScheduleSlot[]];
 
 interface PrintDocument {
-  scheduleName: string;
-  createdAt: string;
   grouping: GridViewMode;
   entries: TimetableEntry[];
 }
@@ -93,7 +92,9 @@ function WeeklyTimetableGrid({
   return (
     <section className="timetable-grid">
       <div className="timetable-grid-header">
-        <h4>{recipientName}</h4>
+        <h4>
+          {grouping === "by_class" ? "Classe" : "Insegnante"}: {recipientName}
+        </h4>
         {onPrint && (
           <button className="btn btn-secondary btn-sm" onClick={onPrint}>
             Stampa / Salva PDF
@@ -275,14 +276,10 @@ export default function SchedulingPage() {
   };
 
   const printTimetables = (
-    scheduleName: string,
-    createdAt: string,
     grouping: GridViewMode,
     entries: TimetableEntry[]
   ) => {
     setPrintDocument({
-      scheduleName,
-      createdAt,
       grouping,
       entries: [...entries].sort(([a], [b]) => a.localeCompare(b, "it")),
     });
@@ -555,8 +552,6 @@ export default function SchedulingPage() {
                 className="btn btn-secondary"
                 onClick={() =>
                   printTimetables(
-                    scheduleName,
-                    selectedSavedSchedule.created_at,
                     viewMode,
                     Object.entries(selectedSavedSchedule.schedule_data[viewMode])
                   )
@@ -667,12 +662,6 @@ export default function SchedulingPage() {
                   if (!scheduleToPrint) return;
 
                   printTimetables(
-                    tabMode === "generate"
-                      ? "Orario generato"
-                      : selectedSavedSchedule!.nickname || selectedSavedSchedule!.name,
-                    tabMode === "generate"
-                      ? schedule!.metadata.generated_at
-                      : selectedSavedSchedule!.created_at,
                     grouping,
                     [[recipientName, slots]]
                   );
@@ -760,8 +749,6 @@ export default function SchedulingPage() {
                 className="btn btn-secondary"
                 onClick={() =>
                   printTimetables(
-                    "Orario generato",
-                    schedule.metadata.generated_at,
                     viewMode,
                     Object.entries(schedule.schedule[viewMode])
                   )
@@ -804,7 +791,8 @@ export default function SchedulingPage() {
   };
 
   return (
-    <div>
+    <>
+      <div className="scheduling-page">
       <div className="page-header">
         <h2>Orario</h2>
         <p>Genera e gestisci gli orari</p>
@@ -863,21 +851,12 @@ export default function SchedulingPage() {
           )}
         </>
       )}
+      </div>
 
-      {printDocument && (
+      {printDocument && createPortal(
         <section className="print-document">
           {printDocument.entries.map(([recipientName, slots]) => (
             <article className="print-timetable-page" key={recipientName}>
-              <header className="print-timetable-header">
-                <div>
-                  <h1>{printDocument.scheduleName}</h1>
-                  <p>
-                    {printDocument.grouping === "by_class" ? "Classe" : "Insegnante"}:{" "}
-                    <strong>{recipientName}</strong>
-                  </p>
-                </div>
-                <p>Creato il: {new Date(printDocument.createdAt).toLocaleString("it-IT")}</p>
-              </header>
               <WeeklyTimetableGrid
                 recipientName={recipientName}
                 slots={slots}
@@ -885,8 +864,9 @@ export default function SchedulingPage() {
               />
             </article>
           ))}
-        </section>
+        </section>,
+        document.body
       )}
-    </div>
+    </>
   );
 }

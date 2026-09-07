@@ -16,7 +16,7 @@ The system SHALL display a weekly timetable grid for every teacher in a complete
 - **THEN** the system displays one weekly grid per teacher with the same layout and cell information
 
 ### Requirement: Individual printable timetable export
-The system SHALL allow a user to open a print-to-PDF flow for one displayed class or teacher timetable. The printable output SHALL contain only the selected recipient's weekly grid together with the schedule name, recipient name and type, and the schedule creation date.
+The system SHALL allow a user to open a print-to-PDF flow for one displayed class or teacher timetable. The printable output SHALL contain the selected recipient's type and name followed by its weekly grid on one landscape A4 page, without application navigation, controls, or schedule metadata.
 
 #### Scenario: Printing one class timetable
 - **WHEN** a user requests a printable export for a displayed class timetable
@@ -27,7 +27,7 @@ The system SHALL allow a user to open a print-to-PDF flow for one displayed clas
 - **THEN** the system opens a print-to-PDF flow containing that teacher's grid on one landscape A4 page
 
 ### Requirement: Batch printable timetable export
-The system SHALL allow a user to open a print-to-PDF flow for all class timetables or all teacher timetables in the active grouping. The output SHALL place each recipient's complete weekly grid on a separate landscape A4 page and include the schedule name, recipient name and type, and schedule creation date on every page.
+The system SHALL allow a user to open a print-to-PDF flow for all class timetables or all teacher timetables in the active grouping. The output SHALL place each recipient's type and name followed by its complete weekly grid on a separate landscape A4 page without application navigation, controls, or schedule metadata.
 
 #### Scenario: Printing all class timetables
 - **WHEN** a user requests a batch printable export while the class grouping is active

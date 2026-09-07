@@ -6,7 +6,7 @@ Completed timetables are difficult to distribute because the class grid is not a
 
 - Display saved and newly generated teacher timetables in the same weekly grid format used for class timetables.
 - Provide a printable, PDF-ready rendition for either one selected class or teacher timetable, or every timetable in the active grouping.
-- Format exported documents as one landscape A4 timetable per page with recipient and schedule metadata, while retaining JSON download.
+- Format exported documents as one landscape A4 timetable per page with only the recipient label, without application chrome or schedule metadata, while retaining JSON download.
 
 ## Capabilities
 

@@ -592,20 +592,12 @@ tr:hover {
     margin: 10mm;
   }
 
-  body * {
-    visibility: hidden;
-  }
-
-  .print-document,
-  .print-document * {
-    visibility: visible;
+  #root {
+    display: none;
   }
 
   .print-document {
     display: block;
-    left: 0;
-    position: absolute;
-    top: 0;
     width: 100%;
   }
 
@@ -619,24 +611,8 @@ tr:hover {
     page-break-after: auto;
   }
 
-  .print-timetable-header {
-    align-items: flex-end;
-    border-bottom: 1px solid #111827;
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 5mm;
-    padding-bottom: 3mm;
-  }
-
-  .print-timetable-header h1 {
-    font-size: 18pt;
-  }
-
-  .print-timetable-header p {
-    font-size: 10pt;
-  }
-
   .print-document .timetable-grid-header {
+    display: block;
     margin-bottom: 4mm;
   }
 
@@ -646,12 +622,18 @@ tr:hover {
   }
 
   .print-document .data-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    border-left: 1px solid #9ca3af;
+    border-top: 1px solid #9ca3af;
     table-layout: fixed;
   }
 
   .print-document th,
   .print-document td {
-    border: 1px solid #9ca3af;
+    border: 0;
+    border-bottom: 1px solid #9ca3af;
+    border-right: 1px solid #9ca3af;
     font-size: 9pt;
     padding: 3mm;
     vertical-align: top;

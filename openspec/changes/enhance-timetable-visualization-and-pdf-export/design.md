@@ -10,7 +10,7 @@ See proposal.md for motivation and specs/timetable-presentation/spec.md for beha
 
 - Use a single reusable weekly-grid representation for class and teacher timetable groups.
 - Support individual and batch print-to-PDF flows without changing schedule data, APIs, or persistence.
-- Produce readable landscape A4 output with one recipient timetable per page.
+- Produce readable landscape A4 output with one recipient timetable grid per page.
 
 **Non-Goals:**
 
@@ -30,7 +30,7 @@ The alternative is a separate teacher-grid branch. That repeats the matrix and c
 
 Individual grid actions will build a print surface for the selected recipient; grouping-level actions will build it for every entry in the active class or teacher grouping. Each print document contains only printable headers and grids, instead of the SPA navigation, controls, metadata panels, or unrelated schedule view.
 
-Printing the whole current page was rejected because its interactive controls and layout do not provide a predictable one-recipient-per-page document. Server-rendered PDFs were rejected because the inputs are already client-side, the app is local and single-user, and it adds a rendering and file-delivery surface without improving the tabular result.
+The print document is rendered in a portal directly under the page body so the application shell can be removed from print layout without hiding the document. Printing the whole current page was rejected because its interactive controls and layout do not provide a predictable one-recipient-per-page document. Server-rendered PDFs were rejected because the inputs are already client-side, the app is local and single-user, and it adds a rendering and file-delivery surface without improving the tabular result.
 
 ### Use browser-native print-to-PDF
 
@@ -40,7 +40,7 @@ Client-side canvas/PDF libraries were rejected because they increase bundle and 
 
 ### Isolate print styling
 
-Print-specific CSS will set landscape A4 pages, hide non-document elements, repeat table headers, and use page-break rules so a recipient grid is not split between pages. The recipient header will identify the class or teacher, schedule, and creation date on each page.
+Print-specific CSS will set landscape A4 pages, hide the application root, repeat table headers, and use page-break rules so a recipient grid is not split between pages. The output contains only the recipient label and timetable grid.
 
 The main limitation is browser print-engine variation. Conservative table sizing, print color adjustment, and testing in supported browsers mitigate layout differences.
 
