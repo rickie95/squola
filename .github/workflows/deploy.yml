@@ -17,7 +17,7 @@ jobs:
       - name: Backup database
         run: |
           mkdir -p ~/squolabk/
-          if [ -f ~/squolabk/current.db]; then
+          if [ -f ~/squolabk/current.db ]; then
             cp ~/squolabk/current.db ~/squolabk/$(date +%Y-%m-%d_%H-%M).db
             echo "Database backed up successfully."
           else

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountApi, authApi } from "../api";
-import { useAuth } from "../auth/AuthProvider";
+import { getApiErrorMessage } from "../api/errors";
+import { useAuth } from "../auth/AuthContext";
 
 export default function AccountPage() {
   const queryClient = useQueryClient();
@@ -18,8 +19,8 @@ export default function AccountPage() {
       await queryClient.setQueryData(["auth", "me"], data);
       setWorkspaceMessage("Nome workspace aggiornato");
     },
-    onError: (err: any) => {
-      setWorkspaceMessage(err?.response?.data?.detail || "Errore durante l'aggiornamento");
+    onError: (error: unknown) => {
+      setWorkspaceMessage(getApiErrorMessage(error, "Errore durante l'aggiornamento"));
     },
   });
 
@@ -32,8 +33,8 @@ export default function AccountPage() {
       await queryClient.setQueryData(["auth", "me"], null);
       window.location.href = "/login";
     },
-    onError: (err: any) => {
-      setPasswordMessage(err?.response?.data?.detail || "Errore durante il cambio password");
+    onError: (error: unknown) => {
+      setPasswordMessage(getApiErrorMessage(error, "Errore durante il cambio password"));
     },
   });
 
@@ -148,4 +149,3 @@ export default function AccountPage() {
     </div>
   );
 }
-
