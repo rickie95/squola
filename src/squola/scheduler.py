@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from squola.models import (
     ClassMatterAssignment,
+    FixedClassLesson,
     MatterRequirements,
     SavedSchedule,
     SchedulePreference,
@@ -49,6 +50,7 @@ class SchedulingData:
 
     # Constraints data
     unavailabilities: list[TeacherUnavailability] = field(default_factory=list)
+    fixed_lessons: list[FixedClassLesson] = field(default_factory=list)
 
     # Index mappings for OR-Tools (entity -> index)
     teacher_index: dict[int, int] = field(default_factory=dict)
@@ -202,6 +204,15 @@ def fetch_scheduling_data(db: Session, workspace_id: int) -> SchedulingData:
         .all()
     )
 
+    # Fetch fixed class lessons with their assignments
+    data.fixed_lessons = list(
+        db
+        .query(FixedClassLesson)
+        .filter(FixedClassLesson.workspace_id == workspace_id)
+        .options(joinedload(FixedClassLesson.assignment))
+        .all()
+    )
+
     # Build index mappings
     for i, teacher in enumerate(data.teachers):
         data.teacher_index[teacher.id] = i
@@ -338,6 +349,20 @@ class ScheduleGenerator:
             for assignment in self.assignments_by_teacher[teacher_id]:
                 # Force this slot to be 0 (not scheduled)
                 self.model.add(self.x[(assignment.id, day, hour)] == 0)
+
+    def _add_fixed_lessons_constraint(self) -> None:
+        """Keep user-configured class lessons in their exact weekly slots."""
+        for fixed_lesson in self.data.fixed_lessons:
+            self.model.add(
+                self.x[
+                    (
+                        fixed_lesson.assignment_id,
+                        fixed_lesson.day_of_week,
+                        fixed_lesson.hour_slot,
+                    )
+                ]
+                == 1
+            )
 
     def _add_max_hours_per_day_constraint(self, max_hours: int = HOURS_PER_DAY) -> None:
         """
@@ -564,6 +589,7 @@ class ScheduleGenerator:
         self._add_teacher_no_overlap_constraint()
         self._add_class_no_overlap_constraint()
         self._add_teacher_unavailability_constraint()
+        self._add_fixed_lessons_constraint()
         self._add_max_hours_per_day_constraint()
         self._add_at_most_three_hours_per_single_lesson_constraint()
 

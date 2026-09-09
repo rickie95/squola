@@ -1,16 +1,27 @@
 """School Classes API endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from squola.auth import get_current_workspace
 from squola.database import get_db
-from squola.models import ClassMatterAssignment, Matter, SchoolClass, Teacher, Workspace
+from squola.models import (
+    ClassMatterAssignment,
+    FixedClassLesson,
+    Matter,
+    SchoolClass,
+    Teacher,
+    TeacherUnavailability,
+    Workspace,
+)
 from squola.schemas import (
     ClassMatterAssignmentCreate,
     ClassMatterAssignmentResponse,
     ClassMatterAssignmentUpdate,
+    FixedClassLessonCreate,
+    FixedClassLessonResponse,
+    FixedClassLessonUpdate,
     SchoolClassCreate,
     SchoolClassResponse,
     SchoolClassUpdate,
@@ -45,6 +56,12 @@ def get_class(
             selectinload(SchoolClass.matter_assignments).selectinload(
                 ClassMatterAssignment.teacher
             ),
+            selectinload(SchoolClass.fixed_lessons)
+            .selectinload(FixedClassLesson.assignment)
+            .selectinload(ClassMatterAssignment.matter),
+            selectinload(SchoolClass.fixed_lessons)
+            .selectinload(FixedClassLesson.assignment)
+            .selectinload(ClassMatterAssignment.teacher),
         )
     )
     school_class = db.scalars(stmt).first()
@@ -53,6 +70,267 @@ def get_class(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Class with id {class_id} not found"
         )
     return school_class
+
+
+def _get_class_assignment(
+    class_id: int,
+    assignment_id: int,
+    workspace_id: int,
+    db: Session,
+) -> ClassMatterAssignment:
+    stmt = (
+        select(ClassMatterAssignment)
+        .where(
+            ClassMatterAssignment.id == assignment_id,
+            ClassMatterAssignment.class_id == class_id,
+            ClassMatterAssignment.workspace_id == workspace_id,
+        )
+        .options(
+            selectinload(ClassMatterAssignment.matter),
+            selectinload(ClassMatterAssignment.teacher),
+        )
+    )
+    assignment = db.scalars(stmt).first()
+    if not assignment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Assignment with id {assignment_id} not found in class {class_id}",
+        )
+    return assignment
+
+
+def _validate_fixed_lesson(
+    *,
+    assignment: ClassMatterAssignment,
+    day_of_week: int,
+    hour_slot: int,
+    workspace_id: int,
+    db: Session,
+    excluded_fixed_lesson_id: int | None = None,
+) -> None:
+    fixed_count_stmt = select(func.count()).select_from(FixedClassLesson).where(
+        FixedClassLesson.assignment_id == assignment.id,
+        FixedClassLesson.workspace_id == workspace_id,
+    )
+    if excluded_fixed_lesson_id is not None:
+        fixed_count_stmt = fixed_count_stmt.where(
+            FixedClassLesson.id != excluded_fixed_lesson_id
+        )
+    fixed_count = db.scalar(fixed_count_stmt) or 0
+    if fixed_count >= assignment.hours_per_week:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Assignment {assignment.matter.name} already has "
+                f"{assignment.hours_per_week} fixed lessons"
+            ),
+        )
+
+    unavailable_stmt = select(TeacherUnavailability).where(
+        TeacherUnavailability.workspace_id == workspace_id,
+        TeacherUnavailability.teacher_id == assignment.teacher_id,
+        TeacherUnavailability.day_of_week == day_of_week,
+        TeacherUnavailability.hour_slot == hour_slot,
+    )
+    if db.scalars(unavailable_stmt).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The teacher is unavailable in this time slot",
+        )
+
+    teacher_conflict_stmt = (
+        select(FixedClassLesson)
+        .join(FixedClassLesson.assignment)
+        .where(
+            FixedClassLesson.workspace_id == workspace_id,
+            FixedClassLesson.day_of_week == day_of_week,
+            FixedClassLesson.hour_slot == hour_slot,
+            ClassMatterAssignment.teacher_id == assignment.teacher_id,
+        )
+    )
+    if excluded_fixed_lesson_id is not None:
+        teacher_conflict_stmt = teacher_conflict_stmt.where(
+            FixedClassLesson.id != excluded_fixed_lesson_id
+        )
+    if db.scalars(teacher_conflict_stmt).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The teacher already has a fixed lesson in this time slot",
+        )
+
+
+def _validate_teacher_change_for_fixed_lessons(
+    assignment: ClassMatterAssignment,
+    teacher_id: int,
+    workspace_id: int,
+    db: Session,
+) -> None:
+    fixed_lessons = list(
+        db.scalars(
+            select(FixedClassLesson).where(
+                FixedClassLesson.assignment_id == assignment.id,
+                FixedClassLesson.workspace_id == workspace_id,
+            )
+        ).all()
+    )
+    if not fixed_lessons:
+        return
+
+    for fixed_lesson in fixed_lessons:
+        unavailable_stmt = select(TeacherUnavailability).where(
+            TeacherUnavailability.workspace_id == workspace_id,
+            TeacherUnavailability.teacher_id == teacher_id,
+            TeacherUnavailability.day_of_week == fixed_lesson.day_of_week,
+            TeacherUnavailability.hour_slot == fixed_lesson.hour_slot,
+        )
+        if db.scalars(unavailable_stmt).first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The new teacher is unavailable during an existing fixed lesson",
+            )
+
+        conflict_stmt = (
+            select(FixedClassLesson)
+            .join(FixedClassLesson.assignment)
+            .where(
+                FixedClassLesson.workspace_id == workspace_id,
+                FixedClassLesson.id != fixed_lesson.id,
+                FixedClassLesson.day_of_week == fixed_lesson.day_of_week,
+                FixedClassLesson.hour_slot == fixed_lesson.hour_slot,
+                ClassMatterAssignment.teacher_id == teacher_id,
+            )
+        )
+        if db.scalars(conflict_stmt).first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The new teacher has another fixed lesson in this time slot",
+            )
+
+
+@router.post(
+    "/{class_id}/fixed-lessons",
+    response_model=FixedClassLessonResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_fixed_lesson(
+    class_id: int,
+    lesson_data: FixedClassLessonCreate,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> FixedClassLesson:
+    """Fix an existing class assignment in a specific weekly slot."""
+    assignment = _get_class_assignment(class_id, lesson_data.assignment_id, workspace.id, db)
+
+    existing_slot = db.scalars(
+        select(FixedClassLesson).where(
+            FixedClassLesson.class_id == class_id,
+            FixedClassLesson.workspace_id == workspace.id,
+            FixedClassLesson.day_of_week == lesson_data.day_of_week,
+            FixedClassLesson.hour_slot == lesson_data.hour_slot,
+        )
+    ).first()
+    if existing_slot:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This class already has a fixed lesson in this time slot",
+        )
+
+    _validate_fixed_lesson(
+        assignment=assignment,
+        day_of_week=lesson_data.day_of_week,
+        hour_slot=lesson_data.hour_slot,
+        workspace_id=workspace.id,
+        db=db,
+    )
+    fixed_lesson = FixedClassLesson(
+        workspace_id=workspace.id,
+        class_id=class_id,
+        assignment_id=assignment.id,
+        day_of_week=lesson_data.day_of_week,
+        hour_slot=lesson_data.hour_slot,
+    )
+    db.add(fixed_lesson)
+    db.commit()
+    db.refresh(fixed_lesson)
+    return fixed_lesson
+
+
+@router.put(
+    "/{class_id}/fixed-lessons/{fixed_lesson_id}",
+    response_model=FixedClassLessonResponse,
+)
+def update_fixed_lesson(
+    class_id: int,
+    fixed_lesson_id: int,
+    lesson_data: FixedClassLessonUpdate,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> FixedClassLesson:
+    """Replace the assignment fixed in a class timetable slot."""
+    fixed_lesson = db.scalars(
+        select(FixedClassLesson)
+        .where(
+            FixedClassLesson.id == fixed_lesson_id,
+            FixedClassLesson.class_id == class_id,
+            FixedClassLesson.workspace_id == workspace.id,
+        )
+        .options(
+            selectinload(FixedClassLesson.assignment).selectinload(
+                ClassMatterAssignment.matter
+            ),
+            selectinload(FixedClassLesson.assignment).selectinload(
+                ClassMatterAssignment.teacher
+            ),
+        )
+    ).first()
+    if not fixed_lesson:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Fixed lesson with id {fixed_lesson_id} not found in class {class_id}",
+        )
+
+    assignment = _get_class_assignment(class_id, lesson_data.assignment_id, workspace.id, db)
+    if assignment.id != fixed_lesson.assignment_id:
+        _validate_fixed_lesson(
+            assignment=assignment,
+            day_of_week=fixed_lesson.day_of_week,
+            hour_slot=fixed_lesson.hour_slot,
+            workspace_id=workspace.id,
+            db=db,
+            excluded_fixed_lesson_id=fixed_lesson.id,
+        )
+        fixed_lesson.assignment_id = assignment.id
+
+    db.commit()
+    db.refresh(fixed_lesson)
+    return fixed_lesson
+
+
+@router.delete(
+    "/{class_id}/fixed-lessons/{fixed_lesson_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_fixed_lesson(
+    class_id: int,
+    fixed_lesson_id: int,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> None:
+    """Remove a fixed lesson from a class timetable slot."""
+    fixed_lesson = db.scalars(
+        select(FixedClassLesson).where(
+            FixedClassLesson.id == fixed_lesson_id,
+            FixedClassLesson.class_id == class_id,
+            FixedClassLesson.workspace_id == workspace.id,
+        )
+    ).first()
+    if not fixed_lesson:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Fixed lesson with id {fixed_lesson_id} not found in class {class_id}",
+        )
+    db.delete(fixed_lesson)
+    db.commit()
 
 
 @router.post("", response_model=SchoolClassResponse, status_code=status.HTTP_201_CREATED)
@@ -373,9 +651,28 @@ def update_class_assignment(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Teacher with id {assignment_data.teacher_id} not found",
             )
+        _validate_teacher_change_for_fixed_lessons(
+            assignment, teacher.id, workspace.id, db
+        )
         assignment.teacher_id = assignment_data.teacher_id
 
     if assignment_data.hours_per_week is not None:
+        fixed_count = db.scalar(
+            select(func.count())
+            .select_from(FixedClassLesson)
+            .where(
+                FixedClassLesson.assignment_id == assignment.id,
+                FixedClassLesson.workspace_id == workspace.id,
+            )
+        ) or 0
+        if assignment_data.hours_per_week < fixed_count:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Weekly hours cannot be less than the number of fixed lessons "
+                    f"({fixed_count})"
+                ),
+            )
         assignment.hours_per_week = assignment_data.hours_per_week
 
     if assignment_data.requirements is not None:
@@ -406,5 +703,13 @@ def delete_class_assignment(
             detail=f"Assignment with id {assignment_id} not found in class {class_id}",
         )
 
+    fixed_lessons = db.scalars(
+        select(FixedClassLesson).where(
+            FixedClassLesson.assignment_id == assignment.id,
+            FixedClassLesson.workspace_id == workspace.id,
+        )
+    ).all()
+    for fixed_lesson in fixed_lessons:
+        db.delete(fixed_lesson)
     db.delete(assignment)
     db.commit()

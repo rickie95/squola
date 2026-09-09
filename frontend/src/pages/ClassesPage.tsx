@@ -1,4 +1,5 @@
 import { useState } from "react";
+import axios from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { classesApi, mattersApi, teachersApi } from "../api";
 import type {
@@ -7,12 +8,22 @@ import type {
   SchoolClassCreate,
   ClassMatterAssignmentCreate,
   ClassMatterAssignment,
+  FixedClassLesson,
   Matter,
 } from "../types";
 import { MatterRequirement, REQUIREMENT_LABELS } from "../types";
 import Modal from "../components/Modal";
 import ClassNameForm from "../components/ClassNameForm";
 
+const DAY_ORDER = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì"];
+const HOUR_ORDER = [
+  "08:00-09:00",
+  "09:00-10:00",
+  "10:00-11:00",
+  "11:00-12:00",
+  "12:00-13:00",
+  "13:00-14:00",
+];
 
 export default function ClassesPage() {
   const queryClient = useQueryClient();
@@ -33,6 +44,7 @@ export default function ClassesPage() {
     requirements: [],
   });
   const [editingAssignment, setEditingAssignment] = useState<ClassMatterAssignment | null>(null);
+  const [fixedLessonError, setFixedLessonError] = useState<string | null>(null);
 
   const { data: classes, isLoading: classesLoading } = useQuery({
     queryKey: ["classes"],
@@ -117,6 +129,45 @@ export default function ClassesPage() {
     },
   });
 
+  const createFixedLessonMutation = useMutation({
+    mutationFn: ({
+      classId,
+      assignmentId,
+      dayOfWeek,
+      hourSlot,
+    }: {
+      classId: number;
+      assignmentId: number;
+      dayOfWeek: number;
+      hourSlot: number;
+    }) =>
+      classesApi.createFixedLesson(classId, {
+        assignment_id: assignmentId,
+        day_of_week: dayOfWeek,
+        hour_slot: hourSlot,
+      }),
+  });
+
+  const updateFixedLessonMutation = useMutation({
+    mutationFn: ({
+      classId,
+      fixedLessonId,
+      assignmentId,
+    }: {
+      classId: number;
+      fixedLessonId: number;
+      assignmentId: number;
+    }) =>
+      classesApi.updateFixedLesson(classId, fixedLessonId, {
+        assignment_id: assignmentId,
+      }),
+  });
+
+  const deleteFixedLessonMutation = useMutation({
+    mutationFn: ({ classId, fixedLessonId }: { classId: number; fixedLessonId: number }) =>
+      classesApi.deleteFixedLesson(classId, fixedLessonId),
+  });
+
   const refetchSelectedClass = async (classId: number) => {
     const updatedClass = await classesApi.get(classId);
     setSelectedClass(updatedClass);
@@ -187,6 +238,7 @@ export default function ClassesPage() {
 
   const handleSelectClass = async (schoolClass: SchoolClass) => {
     const fullClass = await classesApi.get(schoolClass.id);
+    setFixedLessonError(null);
     setSelectedClass(fullClass);
   };
 
@@ -241,6 +293,48 @@ export default function ClassesPage() {
         classId: selectedClass.id,
         assignmentId: assignment.id,
       });
+    }
+  };
+
+  const getFixedLessonError = (error: unknown) => {
+    if (axios.isAxiosError(error) && typeof error.response?.data?.detail === "string") {
+      return error.response.data.detail;
+    }
+    return "Non è stato possibile aggiornare la lezione fissa.";
+  };
+
+  const handleFixedLessonChange = async (
+    dayOfWeek: number,
+    hourSlot: number,
+    assignmentId: number | null,
+    fixedLesson?: FixedClassLesson,
+  ) => {
+    if (!selectedClass) return;
+
+    setFixedLessonError(null);
+    try {
+      if (assignmentId === null && fixedLesson) {
+        await deleteFixedLessonMutation.mutateAsync({
+          classId: selectedClass.id,
+          fixedLessonId: fixedLesson.id,
+        });
+      } else if (assignmentId !== null && fixedLesson) {
+        await updateFixedLessonMutation.mutateAsync({
+          classId: selectedClass.id,
+          fixedLessonId: fixedLesson.id,
+          assignmentId,
+        });
+      } else if (assignmentId !== null) {
+        await createFixedLessonMutation.mutateAsync({
+          classId: selectedClass.id,
+          assignmentId,
+          dayOfWeek,
+          hourSlot,
+        });
+      }
+      await refetchSelectedClass(selectedClass.id);
+    } catch (error) {
+      setFixedLessonError(getFixedLessonError(error));
     }
   };
 
@@ -362,8 +456,9 @@ export default function ClassesPage() {
           </div>
 
           {selectedClass ? (
-            selectedClass.matter_assignments.length > 0 ? (
-              <div className="assignment-list">
+            <>
+              {selectedClass.matter_assignments.length > 0 ? (
+                <div className="assignment-list">
                 {selectedClass.matter_assignments.map((assignment) => (
                   <div key={assignment.id} className="assignment-item">
                     <div className="assignment-info">
@@ -398,12 +493,78 @@ export default function ClassesPage() {
                     </div>
                   </div>
                 ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <p>Nessuna materia associate al momento.</p>
-              </div>
-            )
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <p>Nessuna materia associate al momento.</p>
+                </div>
+              )}
+
+              {selectedClass.matter_assignments.length > 0 && (
+                <section className="fixed-lessons-section">
+                  <h4>Lezioni fisse</h4>
+                  <p className="fixed-lessons-description">
+                    Seleziona le materie da mantenere nella posizione indicata durante la generazione.
+                  </p>
+                  {fixedLessonError && <p className="form-error">{fixedLessonError}</p>}
+                  <div className="table-container">
+                    <table className="data-table fixed-lessons-grid">
+                      <thead>
+                        <tr>
+                          <th>Ora</th>
+                          {DAY_ORDER.map((day) => (
+                            <th key={day}>{day}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {HOUR_ORDER.map((hour, hourIndex) => (
+                          <tr key={hour}>
+                            <td>{hour}</td>
+                            {DAY_ORDER.map((day, dayIndex) => {
+                              const fixedLesson = selectedClass.fixed_lessons.find(
+                                (lesson) =>
+                                  lesson.day_of_week === dayIndex &&
+                                  lesson.hour_slot === hourIndex + 1,
+                              );
+                              const isUpdating =
+                                createFixedLessonMutation.isPending ||
+                                updateFixedLessonMutation.isPending ||
+                                deleteFixedLessonMutation.isPending;
+                              return (
+                                <td key={`${day}-${hour}`}>
+                                  <select
+                                    aria-label={`${day}, ${hour}`}
+                                    disabled={isUpdating}
+                                    value={fixedLesson?.assignment_id ?? ""}
+                                    onChange={(event) =>
+                                      handleFixedLessonChange(
+                                        dayIndex,
+                                        hourIndex + 1,
+                                        event.target.value ? Number(event.target.value) : null,
+                                        fixedLesson,
+                                      )
+                                    }
+                                  >
+                                    <option value="">Libero</option>
+                                    {selectedClass.matter_assignments.map((assignment) => (
+                                      <option key={assignment.id} value={assignment.id}>
+                                        {assignment.matter.name} - {assignment.teacher.first_name}{" "}
+                                        {assignment.teacher.last_name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
+            </>
           ) : (
             <div className="empty-state">
               <p>Seleziona una classe per gestire le materie</p>

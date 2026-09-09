@@ -209,9 +209,38 @@ class ClassMatterAssignmentResponse(ClassMatterAssignmentBase):
     model_config = {"from_attributes": True}
 
 
+class FixedClassLessonBase(BaseModel):
+    """Base schema for a lesson fixed in a class timetable slot."""
+
+    assignment_id: int
+    day_of_week: int = Field(..., ge=0, le=4, description="Day of week (0=Monday, 4=Friday)")
+    hour_slot: int = Field(..., ge=1, le=6, description="Hour slot (1-based)")
+
+
+class FixedClassLessonCreate(FixedClassLessonBase):
+    """Schema for creating a fixed class lesson."""
+
+
+class FixedClassLessonUpdate(BaseModel):
+    """Schema for replacing the assignment of a fixed class lesson."""
+
+    assignment_id: int
+
+
+class FixedClassLessonResponse(FixedClassLessonBase):
+    """Schema for a fixed class lesson response."""
+
+    id: int
+    class_id: int
+    assignment: ClassMatterAssignmentResponse
+
+    model_config = {"from_attributes": True}
+
+
 class SchoolClassWithAssignmentsResponse(SchoolClassResponse):
     """Schema for school class response including matter assignments."""
     matter_assignments: list[ClassMatterAssignmentResponse] = []
+    fixed_lessons: list[FixedClassLessonResponse] = []
 
     model_config = {"from_attributes": True}
 
