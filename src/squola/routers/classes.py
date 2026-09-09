@@ -250,7 +250,19 @@ def create_fixed_lesson(
         hour_slot=lesson_data.hour_slot,
     )
     db.add(fixed_lesson)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as exc:
+        # Handle race on uq_fixed_class_lesson_slot (same class/day/hour)
+        from sqlalchemy.exc import IntegrityError
+
+        if isinstance(exc, IntegrityError):
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This class already has a fixed lesson in this time slot",
+            )
+        raise
     db.refresh(fixed_lesson)
     return fixed_lesson
 
