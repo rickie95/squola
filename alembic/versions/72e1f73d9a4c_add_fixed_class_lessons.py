@@ -57,5 +57,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_fixed_class_lessons_workspace_id", table_name="fixed_class_lessons")
-    op.drop_table("fixed_class_lessons")
+    if sa.inspect(op.get_bind()).has_table("fixed_class_lessons"):
+        op.drop_index(
+            "ix_fixed_class_lessons_workspace_id",
+            table_name="fixed_class_lessons",
+        )
+        op.drop_table("fixed_class_lessons")
