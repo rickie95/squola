@@ -95,6 +95,7 @@ class Workspace(Base):
     classes: Mapped[list["SchoolClass"]] = relationship(back_populates="workspace")
     matters: Mapped[list["Matter"]] = relationship(back_populates="workspace")
     assignments: Mapped[list["ClassMatterAssignment"]] = relationship(back_populates="workspace")
+    fixed_lessons: Mapped[list["FixedClassLesson"]] = relationship(back_populates="workspace")
     schedules: Mapped[list["SavedSchedule"]] = relationship(back_populates="workspace")
 
 
@@ -218,6 +219,10 @@ class SchoolClass(Base):
         back_populates="school_class",
         cascade="all, delete-orphan",
     )
+    fixed_lessons: Mapped[list["FixedClassLesson"]] = relationship(
+        back_populates="school_class",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def name(self) -> str:
@@ -276,9 +281,41 @@ class ClassMatterAssignment(Base):
     school_class: Mapped["SchoolClass"] = relationship(back_populates="matter_assignments")
     matter: Mapped["Matter"] = relationship(back_populates="class_assignments")
     teacher: Mapped["Teacher"] = relationship(back_populates="class_assignments")
+    fixed_lessons: Mapped[list["FixedClassLesson"]] = relationship(
+        back_populates="assignment",
+    )
 
     def __repr__(self) -> str:
         return f"ClassMatterAssignment(class_id={self.class_id}, matter_id={self.matter_id}, teacher_id={self.teacher_id})"
+
+
+class FixedClassLesson(Base):
+    """A lesson that must remain in a specific class timetable slot."""
+
+    __tablename__ = "fixed_class_lessons"
+    __table_args__ = (
+        UniqueConstraint(
+            "class_id",
+            "day_of_week",
+            "hour_slot",
+            name="uq_fixed_class_lesson_slot",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id"), nullable=False, index=True
+    )
+    class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"), nullable=False)
+    assignment_id: Mapped[int] = mapped_column(
+        ForeignKey("class_matter_assignments.id"), nullable=False
+    )
+    day_of_week: Mapped[int] = mapped_column()
+    hour_slot: Mapped[int] = mapped_column()
+
+    workspace: Mapped["Workspace"] = relationship(back_populates="fixed_lessons")
+    school_class: Mapped["SchoolClass"] = relationship(back_populates="fixed_lessons")
+    assignment: Mapped["ClassMatterAssignment"] = relationship(back_populates="fixed_lessons")
 
 
 class SavedSchedule(Base):

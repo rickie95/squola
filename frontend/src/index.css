@@ -582,6 +582,26 @@ tr:hover {
   font-size: 0.85em;
 }
 
+.fixed-lessons-section {
+  margin-top: 1.5rem;
+}
+
+.fixed-lessons-section h4 {
+  color: var(--primary-color);
+  margin-bottom: 0.25rem;
+}
+
+.fixed-lessons-description {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+}
+
+.fixed-lessons-grid select {
+  min-width: 8rem;
+  width: 100%;
+}
+
 .print-document {
   display: none;
 }

@@ -17,6 +17,9 @@ import type {
   ClassMatterAssignment,
   ClassMatterAssignmentCreate,
   ClassMatterAssignmentUpdate,
+  FixedClassLesson,
+  FixedClassLessonCreate,
+  FixedClassLessonUpdate,
   GeneratedSchedule,
   GenerateScheduleRequest,
   SchedulingPreview,
@@ -200,6 +203,33 @@ export const classesApi = {
 
   deleteAssignment: async (classId: number, assignmentId: number): Promise<void> => {
     await api.delete(`/classes/${classId}/assignments/${assignmentId}`);
+  },
+
+  createFixedLesson: async (
+    classId: number,
+    data: FixedClassLessonCreate
+  ): Promise<FixedClassLesson> => {
+    const response = await api.post<FixedClassLesson>(
+      `/classes/${classId}/fixed-lessons`,
+      data
+    );
+    return response.data;
+  },
+
+  updateFixedLesson: async (
+    classId: number,
+    fixedLessonId: number,
+    data: FixedClassLessonUpdate
+  ): Promise<FixedClassLesson> => {
+    const response = await api.put<FixedClassLesson>(
+      `/classes/${classId}/fixed-lessons/${fixedLessonId}`,
+      data
+    );
+    return response.data;
+  },
+
+  deleteFixedLesson: async (classId: number, fixedLessonId: number): Promise<void> => {
+    await api.delete(`/classes/${classId}/fixed-lessons/${fixedLessonId}`);
   },
 };
 

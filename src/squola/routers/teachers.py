@@ -6,7 +6,14 @@ from sqlalchemy.orm import Session, selectinload
 
 from squola.auth import get_current_workspace
 from squola.database import get_db
-from squola.models import Matter, Teacher, TeacherUnavailability, Workspace
+from squola.models import (
+    ClassMatterAssignment,
+    FixedClassLesson,
+    Matter,
+    Teacher,
+    TeacherUnavailability,
+    Workspace,
+)
 from squola.schemas import (
     TeacherCreate,
     TeacherUpdate,
@@ -220,6 +227,22 @@ def add_unavailability(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This time slot is already marked as unavailable for this teacher"
+        )
+
+    fixed_lesson_stmt = (
+        select(FixedClassLesson)
+        .join(FixedClassLesson.assignment)
+        .where(
+            FixedClassLesson.workspace_id == workspace.id,
+            FixedClassLesson.day_of_week == slot_data.day_of_week,
+            FixedClassLesson.hour_slot == slot_data.hour_slot,
+            ClassMatterAssignment.teacher_id == teacher_id,
+        )
+    )
+    if db.scalars(fixed_lesson_stmt).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The teacher already has a fixed lesson in this time slot",
         )
 
     slot = TeacherUnavailability(

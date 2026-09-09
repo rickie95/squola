@@ -116,6 +116,7 @@ export interface ClassMatterAssignment {
 
 export interface SchoolClassWithAssignments extends SchoolClass {
   matter_assignments: ClassMatterAssignment[];
+  fixed_lessons: FixedClassLesson[];
 }
 
 export interface SchoolClassCreate {
@@ -139,6 +140,25 @@ export interface ClassMatterAssignmentUpdate {
   teacher_id?: number;
   hours_per_week?: number;
   requirements?: MatterRequirement[];
+}
+
+export interface FixedClassLesson {
+  id: number;
+  class_id: number;
+  assignment_id: number;
+  day_of_week: number;
+  hour_slot: number;
+  assignment: ClassMatterAssignment;
+}
+
+export interface FixedClassLessonCreate {
+  assignment_id: number;
+  day_of_week: number;
+  hour_slot: number;
+}
+
+export interface FixedClassLessonUpdate {
+  assignment_id: number;
 }
 
 // ============ Scheduling Types ============
