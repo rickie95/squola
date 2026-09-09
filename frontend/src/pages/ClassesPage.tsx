@@ -496,7 +496,7 @@ export default function ClassesPage() {
                 </div>
               ) : (
                 <div className="empty-state">
-                  <p>Nessuna materia associate al momento.</p>
+                  <p>Nessuna materia associata al momento.</p>
                 </div>
               )}
 
