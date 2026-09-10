@@ -22,7 +22,9 @@ Generate a new schedule based on current database data.
 Returns schedule grouped by class, teacher, and day with metadata about the solve.
 
 ### GET /api/scheduling/preview
-Preview scheduling data and potential issues before generation.
+Preview scheduling data and potential issues before generation, including any
+teacher whose own assignments can never form a legal daily workload (see
+below), reported as a human-readable entry in `issues`.
 
 ## Constraints Implemented
 
@@ -37,6 +39,23 @@ Preview scheduling data and potential issues before generation.
 4. **Teacher blacklist**: Teachers cannot be scheduled during their blacklisted time slots (for teachers working at multiple schools).
 
 5. **Daily teacher workload**: On each weekday, a teacher has either no lessons or between 2 and 5 lessons across all assigned classes and matters. A timetable that cannot meet this legal range is infeasible.
+
+### Unsatisfiable Workload Detection
+
+Some combinations are impossible for a single teacher regardless of everyone
+else's schedule - most commonly a low-hour assignment (e.g. 2 hours/week)
+tagged `at_least_twice_per_week`, which forces a 1-hour day with no other
+lesson available to reach the legal 2-hour minimum. Because generation solves
+one joint model for every teacher and class, a single such teacher makes the
+**entire** generation report `INFEASIBLE` with no indication of the cause.
+
+To avoid this, the system checks each teacher's own assignments, fixed
+lessons, and unavailabilities in isolation before reporting a result:
+- `GET /api/scheduling/preview` lists any affected teacher as an entry in
+  `issues`, before generation is attempted.
+- `POST /api/scheduling/generate` names the affected teacher(s) in the `422`
+  error detail instead of a generic infeasibility message, when this is the
+  cause.
 
 ### Soft Constraints (Optimized)
 

@@ -660,6 +660,59 @@ class ScheduleGenerator:
         return slots
 
 
+def find_teachers_with_unsatisfiable_daily_workload(
+    data: SchedulingData, time_limit_seconds: float = 5.0
+) -> list[Teacher]:
+    """
+    Identify teachers whose own assignments can never satisfy the legal daily
+    workload constraint (0, or 2-5 hours/day), independently of every other
+    teacher or class.
+
+    This solves each teacher's assignments, unavailabilities, and fixed lessons
+    in isolation. Adding more teachers or classes to the full joint model can
+    only add constraints (e.g. a class slot already used by another matter),
+    never relax them. So a teacher whose isolated model is infeasible is
+    guaranteed infeasible in the full schedule too - this lets a single
+    unsatisfiable teacher be reported clearly instead of the whole generation
+    failing with an opaque INFEASIBLE status.
+
+    A common cause: a matter requiring "at least twice per week" forces its
+    hours below a legal daily minimum (e.g. a lone 2-hour/week assignment
+    splits into two 1-hour days) with no other assignment on those days to
+    reach the required minimum.
+    """
+    assignments_by_teacher: dict[int, list[ClassMatterAssignment]] = {}
+    for assignment in data.assignments:
+        assignments_by_teacher.setdefault(assignment.teacher_id, []).append(assignment)
+
+    unsatisfiable: list[Teacher] = []
+    for teacher in data.teachers:
+        assignments = assignments_by_teacher.get(teacher.id)
+        if not assignments:
+            continue
+
+        assignment_ids = {a.id for a in assignments}
+        classes_by_id = {a.school_class.id: a.school_class for a in assignments}
+        sub_data = SchedulingData(
+            teachers=[teacher],
+            classes=list(classes_by_id.values()),
+            assignments=assignments,
+            unavailabilities=[
+                u for u in data.unavailabilities if u.teacher_id == teacher.id
+            ],
+            fixed_lessons=[
+                f for f in data.fixed_lessons if f.assignment_id in assignment_ids
+            ],
+        )
+        generator = ScheduleGenerator(sub_data)
+        generator.build_model()
+        result = generator.solve(time_limit_seconds=time_limit_seconds)
+        if result.status not in ("OPTIMAL", "FEASIBLE"):
+            unsatisfiable.append(teacher)
+
+    return unsatisfiable
+
+
 def generate_schedule(
     db: Session,
     workspace_id: int,
