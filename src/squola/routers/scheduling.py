@@ -91,6 +91,7 @@ def generate_schedule_endpoint(
     - Teachers cannot teach two classes at the same time
     - Classes cannot have two lessons at the same time
     - Teachers are not scheduled during their blacklisted slots
+    - Teachers have either 0 or 2 to 5 teaching hours per weekday
     - Teacher preferences (early/late/minimize gaps/maximize gaps) are optimized
     
     Returns the schedule grouped by class, by teacher, and by day.
@@ -110,11 +111,31 @@ def generate_schedule_endpoint(
         )
     
     if schedule.status == "INFEASIBLE":
-        raise HTTPException(
-            status_code=422,
-            detail="No valid schedule could be found with the current constraints. "
-                   "Consider relaxing constraints or adjusting hours per week."
+        from squola.scheduler import (
+            fetch_scheduling_data,
+            find_teachers_with_unsatisfiable_daily_workload,
         )
+
+        data = fetch_scheduling_data(db, workspace_id=workspace.id)
+        unsatisfiable_teachers = find_teachers_with_unsatisfiable_daily_workload(data)
+
+        if unsatisfiable_teachers:
+            names = ", ".join(
+                f"{t.first_name} {t.last_name}" for t in unsatisfiable_teachers
+            )
+            detail = (
+                f"No valid schedule could be found because these teachers cannot have "
+                f"a legal daily workload (0, or 2-5 hours) with their current "
+                f"assignments alone: {names}. Review requirements like 'at least "
+                f"twice per week' on their low-hour matters, or assign them more hours."
+            )
+        else:
+            detail = (
+                "No valid schedule could be found with the current constraints. "
+                "Consider relaxing constraints or adjusting hours per week."
+            )
+
+        raise HTTPException(status_code=422, detail=detail)
     
     if schedule.status == "MODEL_INVALID":
         raise HTTPException(
@@ -148,7 +169,12 @@ def preview_scheduling_data(
     - Number of assignments and total hours to schedule
     - Potential issues (teachers without assignments, etc.)
     """
-    from squola.scheduler import fetch_scheduling_data, DAYS_OF_WEEK, HOURS_PER_DAY
+    from squola.scheduler import (
+        DAYS_OF_WEEK,
+        HOURS_PER_DAY,
+        fetch_scheduling_data,
+        find_teachers_with_unsatisfiable_daily_workload,
+    )
     
     data = fetch_scheduling_data(db, workspace_id=workspace.id)
     
@@ -195,6 +221,18 @@ def preview_scheduling_data(
                 f"Teacher {teacher.first_name} {teacher.last_name} needs {hours} hours "
                 f"but only has {available} slots available (after unavailabilities)"
             )
+
+    # Check for teachers whose own assignments can never form a legal daily
+    # workload (0, or 2-5 hours/day) regardless of anyone else's schedule.
+    # Left undetected, a single such teacher makes the whole generation
+    # report a generic INFEASIBLE with no indication of the cause.
+    for teacher in find_teachers_with_unsatisfiable_daily_workload(data):
+        issues.append(
+            f"Teacher {teacher.first_name} {teacher.last_name} cannot have a legal "
+            f"daily workload (0, or 2-5 hours) with their current assignments alone. "
+            f"Review requirements like 'at least twice per week' on their low-hour "
+            f"matters, or assign them more hours."
+        )
 
     return {
         "summary": {

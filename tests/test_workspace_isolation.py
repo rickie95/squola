@@ -37,7 +37,7 @@ def test_workspace_data_isolation(client: TestClient):
         json={
             "matter_id": matter_id,
             "teacher_id": teacher_id,
-            "hours_per_week": 1,
+            "hours_per_week": 2,
             "requirements": [],
         },
     ).json()["id"]
@@ -66,4 +66,3 @@ def test_workspace_data_isolation(client: TestClient):
         json={"hours_per_week": 2},
     )
     assert cross_update_assignment.status_code == 404
-
