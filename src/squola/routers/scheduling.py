@@ -91,6 +91,7 @@ def generate_schedule_endpoint(
     - Teachers cannot teach two classes at the same time
     - Classes cannot have two lessons at the same time
     - Teachers are not scheduled during their blacklisted slots
+    - Teachers have either 0 or 2 to 5 teaching hours per weekday
     - Teacher preferences (early/late/minimize gaps/maximize gaps) are optimized
     
     Returns the schedule grouped by class, by teacher, and by day.

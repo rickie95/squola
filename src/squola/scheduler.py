@@ -28,6 +28,7 @@ from squola.models import (
 # Schedule constants
 DAYS_OF_WEEK = 5  # Monday to Friday (0-4)
 HOURS_PER_DAY = 6  # 8:00 to 14:00 (slots 1-6)
+LEGAL_DAILY_TEACHING_HOURS = [0, 2, 3, 4, 5]
 DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 HOUR_LABELS = [
     "08:00-09:00",
@@ -364,10 +365,8 @@ class ScheduleGenerator:
                 == 1
             )
 
-    def _add_max_hours_per_day_constraint(self, max_hours: int = HOURS_PER_DAY) -> None:
-        """
-        Soft constraint: Limit hours per day for teachers to avoid overload.
-        """
+    def _add_daily_teacher_workload_constraint(self) -> None:
+        """Enforce the legal daily teaching-hours range for every teacher."""
         for _, assignments in self.assignments_by_teacher.items():
             for day in range(DAYS_OF_WEEK):
                 day_hours = [
@@ -375,7 +374,10 @@ class ScheduleGenerator:
                     for assignment in assignments
                     for hour in range(1, HOURS_PER_DAY + 1)
                 ]
-                self.model.add(sum(day_hours) <= max_hours)
+                self.model.add_linear_expression_in_domain(
+                    sum(day_hours),
+                    cp_model.Domain.from_values(LEGAL_DAILY_TEACHING_HOURS),
+                )
 
     def _add_at_least_twice_per_week_constraint(self) -> None:
         """
@@ -590,7 +592,7 @@ class ScheduleGenerator:
         self._add_class_no_overlap_constraint()
         self._add_teacher_unavailability_constraint()
         self._add_fixed_lessons_constraint()
-        self._add_max_hours_per_day_constraint()
+        self._add_daily_teacher_workload_constraint()
         self._add_at_most_three_hours_per_single_lesson_constraint()
 
         # Matter requirement constraints

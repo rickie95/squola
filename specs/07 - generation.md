@@ -36,7 +36,7 @@ Preview scheduling data and potential issues before generation.
 
 4. **Teacher blacklist**: Teachers cannot be scheduled during their blacklisted time slots (for teachers working at multiple schools).
 
-5. **Max hours per day**: Teachers cannot exceed the maximum hours per day (default: 5 hours).
+5. **Daily teacher workload**: On each weekday, a teacher has either no lessons or between 2 and 5 lessons across all assigned classes and matters. A timetable that cannot meet this legal range is infeasible.
 
 ### Soft Constraints (Optimized)
 
@@ -50,7 +50,7 @@ Teacher preferences are used as optimization objectives:
 
 ## Model Variables
 
-For each assignment `a`, day `d` (0-4), and hour `h` (1-5):
+For each assignment `a`, day `d` (0-4), and hour `h` (1-6):
 - `x[a, d, h]` ∈ {0, 1}: Binary variable indicating if assignment `a` is scheduled at day `d`, hour `h`
 
 ## Schedule Output Format

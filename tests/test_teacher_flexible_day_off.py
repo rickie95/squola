@@ -110,7 +110,7 @@ def scheduled_days(data: SchedulingData) -> set[int]:
 
 def test_flexible_day_off_outranks_early_preference():
     baseline_data = make_data(
-        hours_per_assignment=6,
+        hours_per_assignment=5,
         assignments_count=4,
         prefers_day_off=False,
         preference=SchedulePreference.EARLY,
@@ -118,7 +118,7 @@ def test_flexible_day_off_outranks_early_preference():
     assert len(scheduled_days(baseline_data)) == 5
 
     flexible_day_off_data = make_data(
-        hours_per_assignment=6,
+        hours_per_assignment=5,
         assignments_count=4,
         prefers_day_off=True,
         preference=SchedulePreference.EARLY,
@@ -136,10 +136,10 @@ def test_flexible_day_off_is_relaxed_when_five_days_are_required():
             hour_slot=hour,
         )
         for day in range(5)
-        for hour in range(2, 7)
+        for hour in range(3, 7)
     ]
     data = make_data(
-        hours_per_assignment=5,
+        hours_per_assignment=10,
         assignments_count=1,
         prefers_day_off=True,
         unavailabilities=unavailable,
