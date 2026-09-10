@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { schedulingApi } from "../api";
+import { schedulingApi, teachersApi } from "../api";
 import { getApiErrorMessage } from "../api/errors";
+import { downloadGlobalTeacherTimetable } from "../utils/globalTeacherTimetableExcel";
 import type {
   GeneratedSchedule,
   SchedulingPreview,
@@ -156,6 +157,7 @@ export default function SchedulingPage() {
   const [editingNickname, setEditingNickname] = useState<number | null>(null);
   const [newNickname, setNewNickname] = useState("");
   const [printDocument, setPrintDocument] = useState<PrintDocument | null>(null);
+  const [exportingTeacherTimetable, setExportingTeacherTimetable] = useState(false);
 
   useEffect(() => {
     fetchPreview();
@@ -273,6 +275,33 @@ export default function SchedulingPage() {
     a.download = `schedule_${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const downloadTeacherTimetableExcel = async () => {
+    const activeSchedule = tabMode === "generate" ? schedule : selectedSavedSchedule;
+    if (!activeSchedule) return;
+
+    setExportingTeacherTimetable(true);
+    setError(null);
+    try {
+      const teachers = await teachersApi.list();
+      const slotsByTeacher = tabMode === "generate"
+        ? schedule!.schedule.by_teacher
+        : selectedSavedSchedule!.schedule_data.by_teacher;
+      const scheduleName = tabMode === "generate"
+        ? "orario-generato"
+        : selectedSavedSchedule!.nickname || selectedSavedSchedule!.name;
+
+      await downloadGlobalTeacherTimetable({
+        teachers,
+        slotsByTeacher,
+        scheduleName,
+      });
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, "Errore durante l'esportazione Excel"));
+    } finally {
+      setExportingTeacherTimetable(false);
+    }
   };
 
   const printTimetables = (
@@ -547,6 +576,13 @@ export default function SchedulingPage() {
             <button className="btn btn-secondary" onClick={downloadSchedule}>
               Scarica JSON
             </button>
+            <button
+              className="btn btn-secondary"
+              onClick={downloadTeacherTimetableExcel}
+              disabled={exportingTeacherTimetable}
+            >
+              {exportingTeacherTimetable ? "Esporto Excel..." : "Scarica Excel docenti"}
+            </button>
             {viewMode !== "by_day" && (
               <button
                 className="btn btn-secondary"
@@ -743,6 +779,13 @@ export default function SchedulingPage() {
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <button className="btn btn-secondary" onClick={downloadSchedule}>
               Scarica JSON
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={downloadTeacherTimetableExcel}
+              disabled={exportingTeacherTimetable}
+            >
+              {exportingTeacherTimetable ? "Esporto Excel..." : "Scarica Excel docenti"}
             </button>
             {viewMode !== "by_day" && (
               <button
