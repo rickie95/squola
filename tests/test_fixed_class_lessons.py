@@ -60,7 +60,7 @@ def register(client: TestClient, username: str = "alice") -> None:
 def test_fixed_lesson_can_be_created_updated_and_removed(client: TestClient):
     register(client)
     class_id, _, assignment_id = create_assignment(
-        client, class_year="III", class_section="A", matter_name="Italiano"
+        client, class_year="3", class_section="A", matter_name="Italiano"
     )
 
     created = client.post(
@@ -133,7 +133,7 @@ def test_fixed_lesson_rejects_teacher_conflicts_and_excess_hours(client: TestCli
 def test_fixed_lesson_rejects_teacher_unavailability_in_either_order(client: TestClient):
     register(client)
     class_id, teacher_id, assignment_id = create_assignment(
-        client, class_year="II", class_section="A", matter_name="Matematica"
+        client, class_year="2", class_section="A", matter_name="Matematica"
     )
 
     unavailable = client.post(
@@ -208,7 +208,7 @@ def test_fixed_lessons_are_isolated_by_workspace(client: TestClient):
 
 def test_solver_keeps_fixed_lessons_in_their_configured_slots():
     teacher = Teacher(id=1, workspace_id=1, first_name="Mario", last_name="Rossi")
-    school_class = SchoolClass(id=1, workspace_id=1, year="III", section="A")
+    school_class = SchoolClass(id=1, workspace_id=1, year="3", section="A")
     matter = Matter(id=1, workspace_id=1, name="Italiano")
     assignment = ClassMatterAssignment(
         id=1,
@@ -252,7 +252,7 @@ def test_solver_keeps_fixed_lessons_in_their_configured_slots():
 def test_generation_loads_and_preserves_fixed_lessons(client: TestClient):
     register(client)
     class_id, _, assignment_id = create_assignment(
-        client, class_year="III", class_section="A", matter_name="Italiano"
+        client, class_year="3", class_section="A", matter_name="Italiano"
     )
     for hour_slot in (1, 2):
         response = client.post(
@@ -264,7 +264,7 @@ def test_generation_loads_and_preserves_fixed_lessons(client: TestClient):
     generated = client.post("/api/scheduling/generate", json={"time_limit_seconds": 3})
 
     assert generated.status_code == 200
-    lessons = generated.json()["schedule"]["by_class"]["IIIA"]
+    lessons = generated.json()["schedule"]["by_class"]["3A"]
     assert {(lesson["day"], lesson["hour"], lesson["matter"]) for lesson in lessons} == {
         ("Tuesday", "08:00-09:00", "Italiano"),
         ("Tuesday", "09:00-10:00", "Italiano"),
@@ -273,7 +273,7 @@ def test_generation_loads_and_preserves_fixed_lessons(client: TestClient):
 
 def test_solver_reports_infeasible_when_fixed_lessons_break_other_constraints():
     teacher = Teacher(id=1, workspace_id=1, first_name="Mario", last_name="Rossi")
-    school_class = SchoolClass(id=1, workspace_id=1, year="III", section="A")
+    school_class = SchoolClass(id=1, workspace_id=1, year="3", section="A")
     matter = Matter(id=1, workspace_id=1, name="Italiano")
     assignment = ClassMatterAssignment(
         id=1,

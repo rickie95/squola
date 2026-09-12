@@ -211,7 +211,7 @@ class SchoolClass(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), nullable=False, index=True)
-    year: Mapped[str] = mapped_column(String(10))  # Roman numeral: I, II, III, IV, V
+    year: Mapped[str] = mapped_column(String(10))  # Arabic numeral: 1, 2, 3, 4, 5
     section: Mapped[str] = mapped_column(String(5))  # Letter: A, B, C, etc.
 
     workspace: Mapped["Workspace"] = relationship(back_populates="classes")
@@ -226,7 +226,7 @@ class SchoolClass(Base):
 
     @property
     def name(self) -> str:
-        """Returns the full class name (e.g., IIIA)."""
+        """Returns the full class name (e.g., 3A)."""
         return f"{self.year}{self.section}"
 
     def __repr__(self) -> str:

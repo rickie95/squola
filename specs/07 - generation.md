@@ -84,18 +84,18 @@ For each assignment `a`, day `d` (0-4), and hour `h` (1-6):
   },
   "schedule": {
     "by_class": {
-      "IIIA": [
+      "2A": [
         {"day": "Monday", "hour": "08:00-09:00", "teacher": "John Smith", "matter": "Mathematics"}
       ]
     },
     "by_teacher": {
       "John Smith": [
-        {"day": "Monday", "hour": "08:00-09:00", "class": "IIIA", "matter": "Mathematics"}
+        {"day": "Monday", "hour": "08:00-09:00", "class": "3A", "matter": "Mathematics"}
       ]
     },
     "by_day": {
       "Monday": [
-        {"hour": "08:00-09:00", "class": "IIIA", "teacher": "John Smith", "matter": "Mathematics"}
+        {"hour": "08:00-09:00", "class": "3A", "teacher": "John Smith", "matter": "Mathematics"}
       ]
     }
   }

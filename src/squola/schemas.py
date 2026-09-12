@@ -155,7 +155,7 @@ class TeacherWithMattersResponse(TeacherResponse):
 
 class SchoolClassBase(BaseModel):
     """Base schema for school classes."""
-    year: str = Field(..., min_length=1, max_length=10, description="Year in Roman numerals (I, II, III, IV, V)")
+    year: str = Field(..., min_length=1, max_length=10, description="Year in Roman numerals (1, 2, 3, 4, 5)")
     section: str = Field(..., min_length=1, max_length=5, description="Section letter (A, B, C, etc.)")
 
 
@@ -173,7 +173,7 @@ class SchoolClassUpdate(BaseModel):
 class SchoolClassResponse(SchoolClassBase):
     """Schema for school class response."""
     id: int
-    name: str = Field(..., description="Full class name (e.g., IIIA)")
+    name: str = Field(..., description="Full class name (e.g., 3A)")
 
     model_config = {"from_attributes": True}
 
