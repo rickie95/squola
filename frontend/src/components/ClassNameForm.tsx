@@ -1,6 +1,6 @@
 import type { SchoolClassCreate } from "../types";
 
-const ROMAN_NUMERALS = ["I", "II", "III", "IV", "V"];
+const ROMAN_NUMERALS = ["1", "2", "3", "4", "5"];
 const SECTIONS = ["A", "B", "C", "D", "E", "F"];
 
 interface ClassNameFormProps {

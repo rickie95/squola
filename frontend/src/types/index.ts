@@ -100,7 +100,7 @@ export interface SchoolClass {
   id: number;
   year: string; // Roman numeral
   section: string; // Letter
-  name: string; // Combined (e.g., "IIIA")
+  name: string; // Combined (e.g., "3A")
 }
 
 export interface ClassMatterAssignment {

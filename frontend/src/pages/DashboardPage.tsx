@@ -132,7 +132,7 @@ export default function DashboardPage() {
             <div>
               <strong>Crea le Classi</strong>
               <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
-                Aggiungi le classi (e.g., IIIA, IIB) e assegna le materie con gli insegnanti e le ore settimanali previste.
+                Aggiungi le classi (e.g., 3A, 2B) e assegna le materie con gli insegnanti e le ore settimanali previste.
               </p>
             </div>
           </div>
