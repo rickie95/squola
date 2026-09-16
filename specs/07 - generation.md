@@ -38,7 +38,7 @@ below), reported as a human-readable entry in `issues`.
 
 4. **Teacher blacklist**: Teachers cannot be scheduled during their blacklisted time slots (for teachers working at multiple schools).
 
-5. **Daily teacher workload**: On each weekday, a teacher has either no lessons or between 2 and 5 lessons across all assigned classes and matters. A timetable that cannot meet this legal range is infeasible.
+5. **Daily teacher workload and workweek distribution**: A teacher without a flexible day off has between 2 and 5 lessons on every weekday that is not fully blacklisted. A fully blacklisted weekday has no lessons. A teacher with a flexible day off has at most four teaching weekdays, each with 2 to 5 lessons.
 
 ### Unsatisfiable Workload Detection
 
@@ -65,7 +65,7 @@ Teacher preferences are used as optimization objectives:
 2. **LATE**: Prefer scheduling lessons in later hours
 3. **MINIMIZE_GAPS**: Group lessons together, minimize free periods between lessons
 4. **MAXIMIZE_GAPS**: Spread lessons out, maximize free periods between lessons
-5. **Flexible day off**: For teachers who request it, prefer leaving one solver-selected weekday completely free. This is prioritized over the other soft preferences and is relaxed when required to produce a valid schedule.
+5. **Flexible day-off distribution**: For teachers who request it and have no fully blacklisted weekday, maximize the number of teaching weekdays while keeping at least one solver-selected weekday completely free. The free day is a hard constraint; timing and gap preferences are secondary.
 
 ## Model Variables
 

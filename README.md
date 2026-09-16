@@ -56,7 +56,7 @@ A teacher can be marked as unavailable for specific time slots — e.g., hours t
 
 **UI:** `/teachers/:id` — teacher detail page with a 5×6 interactive grid. Click a cell to toggle a single slot; click a day header to block/unblock the entire day (sends one request per hour slot).
 
-**Solver:** `ScheduleGenerator._add_teacher_unavailability_constraint()` in `src/squola/scheduler.py` forces the corresponding CP-SAT variable to 0.
+**Solver:** `ScheduleGenerator._add_teacher_unavailability_constraint()` in `src/squola/scheduler.py` forces the corresponding CP-SAT variable to 0. A weekday with all six periods blocked is a hard day off; teachers work on every other weekday unless they request a solver-selected flexible day off. The flexible request is a hard requirement for at least one free weekday, cannot coexist with a full-day block, and is cleared automatically when a full-day block is completed.
 
 ---
 

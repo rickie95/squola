@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { teachersApi, mattersApi } from "../api";
+import { getApiErrorMessage } from "../api/errors";
 import type { Teacher, TeacherWithMatters, TeacherCreate, SchedulePreference } from "../types";
 import Modal from "../components/Modal";
 
@@ -18,6 +19,7 @@ export default function TeachersPage() {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<TeacherWithMatters | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [formData, setFormData] = useState<TeacherCreate>({
     first_name: "",
     last_name: "",
@@ -52,6 +54,9 @@ export default function TeachersPage() {
       queryClient.invalidateQueries({ queryKey: ["teachers"] });
       closeModal();
     },
+    onError: (error: unknown) => {
+      setFormError(getApiErrorMessage(error, "Impossibile aggiornare l'insegnante"));
+    },
   });
 
   const deleteMutation = useMutation({
@@ -63,6 +68,7 @@ export default function TeachersPage() {
 
   const openCreateModal = () => {
     setEditingTeacher(null);
+    setFormError(null);
     setFormData({
       first_name: "",
       last_name: "",
@@ -78,6 +84,7 @@ export default function TeachersPage() {
     // Fetch full teacher details including matters
     const fullTeacher = await teachersApi.get(teacher.id);
     setEditingTeacher(fullTeacher);
+    setFormError(null);
     setFormData({
       first_name: fullTeacher.first_name,
       last_name: fullTeacher.last_name,
@@ -92,6 +99,7 @@ export default function TeachersPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingTeacher(null);
+    setFormError(null);
     setFormData({
       first_name: "",
       last_name: "",
@@ -128,6 +136,14 @@ export default function TeachersPage() {
       : [...currentIds, matterId];
     setFormData({ ...formData, matter_ids: newIds });
   };
+
+  const hasFullyUnavailableDay = Boolean(
+    editingTeacher?.unavailabilities.some((slot) =>
+      editingTeacher.unavailabilities.filter(
+        (otherSlot) => otherSlot.day_of_week === slot.day_of_week
+      ).length === 6
+    )
+  );
 
   if (teachersLoading) {
     return <div className="loading">Carico la lista insegnanti...</div>;
@@ -246,13 +262,16 @@ export default function TeachersPage() {
                 type="checkbox"
                 checked={formData.prefers_day_off || false}
                 onChange={(e) => setFormData({ ...formData, prefers_day_off: e.target.checked })}
+                disabled={hasFullyUnavailableDay}
               />
               Richiedi un giorno libero flessibile
             </label>
             <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-              Il generatore sceglie il giorno e prova a rispettare la richiesta senza
-              compromettere la fattibilità dell'orario.
+              {hasFullyUnavailableDay
+                ? "Non disponibile: un giorno interamente bloccato fornisce già il giorno libero."
+                : "Il generatore sceglie un giorno interamente libero. La richiesta è vincolante e l'orario verrà distribuito sugli altri giorni compatibili."}
             </p>
+            {formError && <p className="form-error">{formError}</p>}
           </div>
 
           <div className="form-group">

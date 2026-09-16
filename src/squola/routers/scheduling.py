@@ -114,21 +114,18 @@ def generate_schedule_endpoint(
         from squola.scheduler import (
             fetch_scheduling_data,
             find_teachers_with_unsatisfiable_daily_workload,
+            teacher_workweek_infeasibility_message,
         )
 
         data = fetch_scheduling_data(db, workspace_id=workspace.id)
         unsatisfiable_teachers = find_teachers_with_unsatisfiable_daily_workload(data)
 
         if unsatisfiable_teachers:
-            names = ", ".join(
-                f"{t.first_name} {t.last_name}" for t in unsatisfiable_teachers
-            )
-            detail = (
-                f"No valid schedule could be found because these teachers cannot have "
-                f"a legal daily workload (0, or 2-5 hours) with their current "
-                f"assignments alone: {names}. Review requirements like 'at least "
-                f"twice per week' on their low-hour matters, or assign them more hours."
-            )
+            details = [
+                teacher_workweek_infeasibility_message(data, teacher)
+                for teacher in unsatisfiable_teachers
+            ]
+            detail = "No valid schedule could be found. " + " ".join(details)
         else:
             detail = (
                 "No valid schedule could be found with the current constraints. "
@@ -174,6 +171,7 @@ def preview_scheduling_data(
         HOURS_PER_DAY,
         fetch_scheduling_data,
         find_teachers_with_unsatisfiable_daily_workload,
+        teacher_workweek_infeasibility_message,
     )
     
     data = fetch_scheduling_data(db, workspace_id=workspace.id)
@@ -222,17 +220,8 @@ def preview_scheduling_data(
                 f"but only has {available} slots available (after unavailabilities)"
             )
 
-    # Check for teachers whose own assignments can never form a legal daily
-    # workload (0, or 2-5 hours/day) regardless of anyone else's schedule.
-    # Left undetected, a single such teacher makes the whole generation
-    # report a generic INFEASIBLE with no indication of the cause.
     for teacher in find_teachers_with_unsatisfiable_daily_workload(data):
-        issues.append(
-            f"Teacher {teacher.first_name} {teacher.last_name} cannot have a legal "
-            f"daily workload (0, or 2-5 hours) with their current assignments alone. "
-            f"Review requirements like 'at least twice per week' on their low-hour "
-            f"matters, or assign them more hours."
-        )
+        issues.append(teacher_workweek_infeasibility_message(data, teacher))
 
     return {
         "summary": {

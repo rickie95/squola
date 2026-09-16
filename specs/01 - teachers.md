@@ -6,8 +6,9 @@
 4. a teacher teaches in one or more classes
 5. a teacher teaches in only one class in a given slot
 6. the list of classes a teacher teachs is given as a input by the user
-7. a teacher might teach in another school, in that case it needs to have those hours blacklisted
+7. a teacher might teach in another school, in that case it needs to have those hours blacklisted; a weekday with every teaching slot blacklisted is a hard day off
 8. a teacher might express a preference to work in the first hours or in the latest hours of the schedule
 9. a teacher might express a preference to minimize gaps, resulting in more lessons grouped
 10. a teacher might express a preference to maximize gaps, resulting in more free time between lessons
-11. a teacher can request an unspecified flexible day off; this request is disabled by default, and the solver chooses the day when feasible
+11. a teacher can request an unspecified flexible day off; this request is disabled by default, the solver chooses a hard day off, and it cannot coexist with a fully blacklisted weekday
+12. a teacher without a flexible day off teaches on every weekday that is not fully blacklisted, with between two and five lessons per teaching day

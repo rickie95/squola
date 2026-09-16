@@ -216,7 +216,7 @@ def test_solver_keeps_fixed_lessons_in_their_configured_slots():
         class_id=school_class.id,
         matter_id=matter.id,
         teacher_id=teacher.id,
-        hours_per_week=2,
+        hours_per_week=10,
         requirements=[],
         teacher=teacher,
         school_class=school_class,
@@ -246,13 +246,18 @@ def test_solver_keeps_fixed_lessons_in_their_configured_slots():
     schedule = generator.solve()
 
     assert schedule.status == "OPTIMAL"
-    assert {(slot.day, slot.hour) for slot in schedule.slots} == {(1, 1), (1, 2)}
+    assert len(schedule.slots) == 10
+    assert {(1, 1), (1, 2)} <= {(slot.day, slot.hour) for slot in schedule.slots}
 
 
 def test_generation_loads_and_preserves_fixed_lessons(client: TestClient):
     register(client)
     class_id, _, assignment_id = create_assignment(
-        client, class_year="3", class_section="A", matter_name="Italiano"
+        client,
+        class_year="3",
+        class_section="A",
+        matter_name="Italiano",
+        hours_per_week=10,
     )
     for hour_slot in (1, 2):
         response = client.post(
@@ -265,10 +270,11 @@ def test_generation_loads_and_preserves_fixed_lessons(client: TestClient):
 
     assert generated.status_code == 200
     lessons = generated.json()["schedule"]["by_class"]["3A"]
-    assert {(lesson["day"], lesson["hour"], lesson["matter"]) for lesson in lessons} == {
+    assert len(lessons) == 10
+    assert {
         ("Tuesday", "08:00-09:00", "Italiano"),
         ("Tuesday", "09:00-10:00", "Italiano"),
-    }
+    } <= {(lesson["day"], lesson["hour"], lesson["matter"]) for lesson in lessons}
 
 
 def test_solver_reports_infeasible_when_fixed_lessons_break_other_constraints():

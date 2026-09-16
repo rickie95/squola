@@ -37,7 +37,7 @@ def test_workspace_data_isolation(client: TestClient):
         json={
             "matter_id": matter_id,
             "teacher_id": teacher_id,
-            "hours_per_week": 2,
+            "hours_per_week": 10,
             "requirements": [],
         },
     ).json()["id"]
