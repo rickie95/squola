@@ -175,7 +175,7 @@ def update_teacher(
                 TeacherUnavailability.workspace_id == workspace.id,
             )
             .group_by(TeacherUnavailability.day_of_week)
-            .having(func.count(TeacherUnavailability.id) == 6)
+            .having(func.count(func.distinct(TeacherUnavailability.hour_slot)) == 6)
         )
         result = db.execute(
             update(Teacher)
@@ -301,7 +301,7 @@ def add_unavailability(
     db.add(slot)
     db.flush()
     day_slot_count = db.scalar(
-        select(func.count(TeacherUnavailability.id)).where(
+        select(func.count(func.distinct(TeacherUnavailability.hour_slot))).where(
             TeacherUnavailability.teacher_id == teacher_id,
             TeacherUnavailability.workspace_id == workspace.id,
             TeacherUnavailability.day_of_week == slot_data.day_of_week,
