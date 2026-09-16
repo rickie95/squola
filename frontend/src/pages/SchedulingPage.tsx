@@ -152,7 +152,7 @@ export default function SchedulingPage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("by_class");
-  const [timeLimit, setTimeLimit] = useState(30);
+  const [timeLimit, setTimeLimit] = useState(120);
   const [nickname, setNickname] = useState("");
   const [editingNickname, setEditingNickname] = useState<number | null>(null);
   const [newNickname, setNewNickname] = useState("");

@@ -12,7 +12,7 @@ Generate a new schedule based on current database data.
 **Request Body:**
 ```json
 {
-  "time_limit_seconds": 60.0,
+  "time_limit_seconds": 120.0,
   "save_to_file": false,
   "output_path": "./schedule_output.json"
 }

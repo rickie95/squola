@@ -29,6 +29,7 @@ from squola.models import (
 DAYS_OF_WEEK = 5  # Monday to Friday (0-4)
 HOURS_PER_DAY = 6  # 8:00 to 14:00 (slots 1-6)
 LEGAL_DAILY_TEACHING_HOURS = [0, 2, 3, 4, 5]
+MAX_DAILY_ASSIGNMENT_HOURS = 3  # hours of one matter-class assignment in one day
 DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 HOUR_LABELS = [
     "08:00-09:00",
@@ -526,16 +527,22 @@ class ScheduleGenerator:
             if block_indicators:
                 self.model.add(sum(block_indicators) >= 1)
 
-    def _add_at_most_three_hours_per_single_lesson_constraint(self) -> None:
+    def _add_daily_assignment_cap_constraint(self) -> None:
+        """
+        Constraint: a matter-class assignment occupies at most
+        MAX_DAILY_ASSIGNMENT_HOURS hours in a single day.
+
+        Subsumes the previous 4-consecutive-hours rule: a total of 3 hours in a
+        day cannot be 4 consecutive ones. Unlike that rule, this also rejects a
+        day split as 3 hours plus a later extra hour of the same matter.
+        """
         for assignment in self.data.assignments:
             for day in range(DAYS_OF_WEEK):
-                for start_hour in range(1, HOURS_PER_DAY - 3 + 1):
-                    block_vars = [
-                        self.x[(assignment.id, day, hour)]
-                        # the block of 4 consecutive hours is needed to exclude possibility of 4-hour lessons
-                        for hour in range(start_hour, start_hour + 4)
-                    ]
-                    self.model.add(sum(block_vars) <= 3)
+                day_vars = [
+                    self.x[(assignment.id, day, hour)]
+                    for hour in range(1, HOURS_PER_DAY + 1)
+                ]
+                self.model.add(sum(day_vars) <= MAX_DAILY_ASSIGNMENT_HOURS)
 
     def _add_preference_objectives(self) -> None:
         """
@@ -635,7 +642,7 @@ class ScheduleGenerator:
         self._add_teacher_unavailability_constraint()
         self._add_fixed_lessons_constraint()
         self._add_daily_teacher_workload_constraint()
-        self._add_at_most_three_hours_per_single_lesson_constraint()
+        self._add_daily_assignment_cap_constraint()
 
         # Matter requirement constraints
         self._add_at_least_twice_per_week_constraint()
@@ -645,7 +652,7 @@ class ScheduleGenerator:
         # Soft constraints (objectives)
         self._add_preference_objectives()
 
-    def solve(self, time_limit_seconds: float = 60.0) -> GeneratedSchedule:
+    def solve(self, time_limit_seconds: float = 120.0) -> GeneratedSchedule:
         """
         Solve the scheduling problem and return the generated schedule.
 
@@ -657,6 +664,7 @@ class ScheduleGenerator:
         """
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = time_limit_seconds
+        solver.parameters.num_search_workers = 8
 
         status = solver.Solve(self.model)
 
@@ -757,7 +765,7 @@ def find_teachers_with_unsatisfiable_daily_workload(
 def generate_schedule(
     db: Session,
     workspace_id: int,
-    time_limit_seconds: float = 60.0,
+    time_limit_seconds: float = 120.0,
     save_to_db: bool = True,
     nickname: str | None = None,
 ) -> GeneratedSchedule:

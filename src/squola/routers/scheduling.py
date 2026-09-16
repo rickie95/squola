@@ -26,7 +26,7 @@ router = APIRouter(prefix="/scheduling", tags=["scheduling"])
 class GenerateScheduleRequest(BaseModel):
     """Request parameters for schedule generation."""
     time_limit_seconds: float = Field(
-        default=60.0,
+        default=120.0,
         ge=1.0,
         le=600.0,
         description="Maximum time in seconds to spend solving the schedule"
