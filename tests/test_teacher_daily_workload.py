@@ -93,6 +93,43 @@ def test_zero_hour_days_are_legal():
     assert {slot.day for slot in schedule.slots} == {0}
 
 
+def test_teacher_without_full_day_blocks_works_all_weekdays():
+    schedule = solve(make_data([10]))
+
+    assert schedule.status == "OPTIMAL"
+    assert {slot.day for slot in schedule.slots} == {0, 1, 2, 3, 4}
+    assert all(
+        2 <= sum(slot.day == day for slot in schedule.slots) <= 5
+        for day in range(5)
+    )
+
+
+def test_full_day_block_excludes_only_that_workday():
+    schedule = solve(make_data([8], unavailable_days={2}))
+
+    assert schedule.status == "OPTIMAL"
+    assert {slot.day for slot in schedule.slots} == {0, 1, 3, 4}
+
+
+def test_partial_unavailability_keeps_weekday_as_required_workday():
+    data = make_data([10])
+    data.unavailabilities = [
+        TeacherUnavailability(
+            id=1,
+            workspace_id=1,
+            teacher_id=1,
+            day_of_week=2,
+            hour_slot=1,
+        )
+    ]
+
+    schedule = solve(data)
+
+    assert schedule.status == "OPTIMAL"
+    assert {slot.day for slot in schedule.slots} == {0, 1, 2, 3, 4}
+    assert all(not (slot.day == 2 and slot.hour == 1) for slot in schedule.slots)
+
+
 @pytest.mark.parametrize(
     ("hours_per_week", "unavailable_days"),
     [(1, set()), (6, {1, 2, 3, 4})],
@@ -114,7 +151,7 @@ def test_daily_workload_combines_assignments_for_the_same_teacher():
 
 
 def test_fixed_single_lesson_can_be_paired_to_form_a_legal_workday():
-    data = make_data([1, 1])
+    data = make_data([1, 1], unavailable_days={1, 2, 3, 4})
     fixed_lesson = FixedClassLesson(
         id=1,
         workspace_id=1,
@@ -221,7 +258,22 @@ def test_padded_low_hour_at_least_twice_assignments_are_not_flagged():
         )
         classes.append(school_class)
 
-    data = SchedulingData(teachers=[teacher], classes=classes, assignments=assignments)
+    data = SchedulingData(
+        teachers=[teacher],
+        classes=classes,
+        assignments=assignments,
+        unavailabilities=[
+            TeacherUnavailability(
+                id=day * 10 + hour,
+                workspace_id=1,
+                teacher_id=teacher.id,
+                day_of_week=day,
+                hour_slot=hour,
+            )
+            for day in {3, 4}
+            for hour in range(1, 7)
+        ],
+    )
 
     assert find_teachers_with_unsatisfiable_daily_workload(data) == []
     assert solve(data).status in ("OPTIMAL", "FEASIBLE")
@@ -287,5 +339,4 @@ def test_generate_reports_unsatisfiable_teacher_in_error_detail(client):
 
     assert generated.status_code == 422
     assert "Spezz One" in generated.json()["detail"]
-
 

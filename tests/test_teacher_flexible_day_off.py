@@ -53,6 +53,114 @@ def test_teacher_day_off_preference_defaults_and_can_be_updated(client: TestClie
     assert disabled.json()["prefers_day_off"] is False
 
 
+def test_completing_full_day_unavailability_clears_flexible_day_off(client: TestClient):
+    client.post(
+        "/api/auth/register",
+        json={"username": "alice", "password": "alice-password12"},
+    )
+    teacher = client.post(
+        "/api/teachers",
+        json={"first_name": "Alice", "last_name": "Rossi", "prefers_day_off": True},
+    ).json()
+
+    for hour in range(1, 6):
+        response = client.post(
+            f"/api/teachers/{teacher['id']}/unavailabilities",
+            json={"day_of_week": 0, "hour_slot": hour},
+        )
+        assert response.status_code == 201
+        assert client.get(f"/api/teachers/{teacher['id']}").json()["prefers_day_off"] is True
+
+    completed = client.post(
+        f"/api/teachers/{teacher['id']}/unavailabilities",
+        json={"day_of_week": 0, "hour_slot": 6},
+    )
+
+    assert completed.status_code == 201
+    assert client.get(f"/api/teachers/{teacher['id']}").json()["prefers_day_off"] is False
+
+
+def test_flexible_day_off_is_rejected_when_full_day_is_unavailable(client: TestClient):
+    client.post(
+        "/api/auth/register",
+        json={"username": "alice", "password": "alice-password12"},
+    )
+    teacher = client.post(
+        "/api/teachers",
+        json={"first_name": "Alice", "last_name": "Rossi"},
+    ).json()
+    for hour in range(1, 7):
+        response = client.post(
+            f"/api/teachers/{teacher['id']}/unavailabilities",
+            json={"day_of_week": 0, "hour_slot": hour},
+        )
+        assert response.status_code == 201
+
+    rejected = client.put(
+        f"/api/teachers/{teacher['id']}",
+        json={"prefers_day_off": True},
+    )
+
+    assert rejected.status_code == 409
+    assert "fully unavailable weekday" in rejected.json()["detail"]
+
+
+def test_partial_unavailability_does_not_prevent_flexible_day_off(client: TestClient):
+    client.post(
+        "/api/auth/register",
+        json={"username": "alice", "password": "alice-password12"},
+    )
+    teacher = client.post(
+        "/api/teachers",
+        json={"first_name": "Alice", "last_name": "Rossi"},
+    ).json()
+    response = client.post(
+        f"/api/teachers/{teacher['id']}/unavailabilities",
+        json={"day_of_week": 0, "hour_slot": 1},
+    )
+    assert response.status_code == 201
+
+    enabled = client.put(
+        f"/api/teachers/{teacher['id']}",
+        json={"prefers_day_off": True},
+    )
+
+    assert enabled.status_code == 200
+    assert enabled.json()["prefers_day_off"] is True
+
+
+def test_preview_and_generation_explain_infeasible_flexible_day_load(client: TestClient):
+    client.post(
+        "/api/auth/register",
+        json={"username": "alice", "password": "alice-password12"},
+    )
+    matter = client.post(
+        "/api/matters", json={"name": "Italiano", "default_requirements": []}
+    ).json()
+    teacher = client.post(
+        "/api/teachers",
+        json={"first_name": "Alice", "last_name": "Rossi", "prefers_day_off": True},
+    ).json()
+    school_class = client.post("/api/classes", json={"year": "1", "section": "A"}).json()
+    assignment = client.post(
+        f"/api/classes/{school_class['id']}/assignments",
+        json={
+            "matter_id": matter["id"],
+            "teacher_id": teacher["id"],
+            "hours_per_week": 21,
+            "requirements": [],
+        },
+    )
+    assert assignment.status_code == 201
+
+    preview = client.get("/api/scheduling/preview")
+    generated = client.post("/api/scheduling/generate", json={"time_limit_seconds": 3})
+
+    assert any("flexible day off" in issue for issue in preview.json()["issues"])
+    assert generated.status_code == 422
+    assert "flexible day off" in generated.json()["detail"]
+
+
 def make_data(
     *,
     hours_per_assignment: int,
@@ -108,59 +216,66 @@ def scheduled_days(data: SchedulingData) -> set[int]:
     return {slot.day for slot in result.slots}
 
 
-def test_flexible_day_off_outranks_early_preference():
+def test_flexible_day_off_is_hard_and_uses_four_workdays_when_possible():
     baseline_data = make_data(
-        hours_per_assignment=5,
-        assignments_count=4,
+        hours_per_assignment=10,
+        assignments_count=1,
         prefers_day_off=False,
         preference=SchedulePreference.EARLY,
     )
     assert len(scheduled_days(baseline_data)) == 5
 
     flexible_day_off_data = make_data(
-        hours_per_assignment=5,
-        assignments_count=4,
-        prefers_day_off=True,
-        preference=SchedulePreference.EARLY,
-    )
-    assert len(scheduled_days(flexible_day_off_data)) <= 4
-
-
-def test_flexible_day_off_is_relaxed_when_five_days_are_required():
-    unavailable = [
-        TeacherUnavailability(
-            id=day * 10 + hour,
-            workspace_id=1,
-            teacher_id=1,
-            day_of_week=day,
-            hour_slot=hour,
-        )
-        for day in range(5)
-        for hour in range(3, 7)
-    ]
-    data = make_data(
         hours_per_assignment=10,
         assignments_count=1,
         prefers_day_off=True,
-        unavailabilities=unavailable,
+        preference=SchedulePreference.EARLY,
     )
-    assert scheduled_days(data) == {0, 1, 2, 3, 4}
+    assert len(scheduled_days(flexible_day_off_data)) == 4
 
 
-def test_fixed_unavailability_remains_hard_with_flexible_day_off():
-    blocked = TeacherUnavailability(
-        id=1, workspace_id=1, teacher_id=1, day_of_week=0, hour_slot=1
-    )
+def test_flexible_day_off_maximizes_workdays_for_low_load():
     data = make_data(
-        hours_per_assignment=2,
+        hours_per_assignment=6,
         assignments_count=1,
         prefers_day_off=True,
-        unavailabilities=[blocked],
+    )
+    assert len(scheduled_days(data)) == 3
+
+
+def test_flexible_day_off_is_infeasible_when_load_requires_five_days():
+    data = make_data(
+        hours_per_assignment=21,
+        assignments_count=1,
+        prefers_day_off=True,
+    )
+    schedule = ScheduleGenerator(data)
+    schedule.build_model()
+
+    assert schedule.solve().status == "INFEASIBLE"
+
+
+def test_full_day_unavailability_overrides_flexible_day_off():
+    blocked = [
+        TeacherUnavailability(
+            id=hour,
+            workspace_id=1,
+            teacher_id=1,
+            day_of_week=0,
+            hour_slot=hour,
+        )
+        for hour in range(1, 7)
+    ]
+    data = make_data(
+        hours_per_assignment=8,
+        assignments_count=1,
+        prefers_day_off=True,
+        unavailabilities=blocked,
     )
     schedule = ScheduleGenerator(data)
     schedule.build_model()
     result = schedule.solve()
 
     assert result.status == "OPTIMAL"
-    assert all(not (slot.day == 0 and slot.hour == 1) for slot in result.slots)
-    assert len({slot.day for slot in result.slots}) <= 4
+    assert all(slot.day != 0 for slot in result.slots)
+    assert {slot.day for slot in result.slots} == {1, 2, 3, 4}

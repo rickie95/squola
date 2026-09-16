@@ -40,6 +40,47 @@ HOUR_LABELS = [
 ]
 
 
+def fully_unavailable_days(
+    unavailabilities: list[TeacherUnavailability], teacher_id: int
+) -> set[int]:
+    """Return weekdays whose every teaching period is hard-blocked."""
+    unavailable_by_day: dict[int, set[int]] = {}
+    for slot in unavailabilities:
+        if slot.teacher_id == teacher_id:
+            unavailable_by_day.setdefault(slot.day_of_week, set()).add(slot.hour_slot)
+
+    teaching_hours = set(range(1, HOURS_PER_DAY + 1))
+    return {
+        day for day, hours in unavailable_by_day.items() if hours == teaching_hours
+    }
+
+
+def teacher_workweek_infeasibility_message(
+    data: "SchedulingData", teacher: Teacher
+) -> str:
+    """Explain the workweek rule that makes a teacher's isolated model infeasible."""
+    weekly_hours = sum(
+        assignment.hours_per_week
+        for assignment in data.assignments
+        if assignment.teacher_id == teacher.id
+    )
+    fully_blocked = fully_unavailable_days(data.unavailabilities, teacher.id)
+
+    if teacher.prefers_day_off and not fully_blocked and weekly_hours > 4 * 5:
+        return (
+            f"Teacher {teacher.first_name} {teacher.last_name} has {weekly_hours} weekly "
+            "hours, but a flexible day off requires at least one fully free weekday "
+            "and permits at most 20 hours across the other four weekdays."
+        )
+
+    eligible_days = DAYS_OF_WEEK - len(fully_blocked)
+    return (
+        f"Teacher {teacher.first_name} {teacher.last_name} cannot distribute "
+        f"{weekly_hours} weekly hours across all {eligible_days} eligible weekday(s) "
+        "with 2 to 5 lessons per teaching day."
+    )
+
+
 @dataclass
 class SchedulingData:
     """Data container for all scheduling-related information from the database."""
@@ -242,7 +283,7 @@ class ScheduleGenerator:
         # Decision variables: x[assignment_id, day, hour] = 1 if assignment is scheduled
         # at that day and hour
         self.x: dict[tuple[int, int, int], cp_model.IntVar] = {}
-        self.day_off_violations: list[cp_model.IntVar] = []
+        self.flexible_workdays: list[cp_model.IntVar] = []
 
         # Build reverse lookups for constraints
         self._build_lookups()
@@ -267,6 +308,10 @@ class ScheduleGenerator:
         self.unavailable: set[tuple[int, int, int]] = set()
         for slot in self.data.unavailabilities:
             self.unavailable.add((slot.teacher_id, slot.day_of_week, slot.hour_slot))
+        self.fully_unavailable_by_teacher = {
+            teacher.id: fully_unavailable_days(self.data.unavailabilities, teacher.id)
+            for teacher in self.data.teachers
+        }
 
         # Build requirement-based assignment lookups
         self.at_least_twice_per_week_assignments: set[int] = set()
@@ -366,18 +411,37 @@ class ScheduleGenerator:
             )
 
     def _add_daily_teacher_workload_constraint(self) -> None:
-        """Enforce the legal daily teaching-hours range for every teacher."""
-        for _, assignments in self.assignments_by_teacher.items():
+        """Enforce workday distribution and legal daily teaching-hour limits."""
+        for teacher_id, assignments in self.assignments_by_teacher.items():
+            teacher = next(teacher for teacher in self.data.teachers if teacher.id == teacher_id)
+            fully_unavailable = self.fully_unavailable_by_teacher[teacher_id]
+
+            # A legacy contradictory record is treated like a hard full-day block:
+            # hard unavailability takes precedence over a flexible request.
+            uses_flexible_day = teacher.prefers_day_off and not fully_unavailable
             for day in range(DAYS_OF_WEEK):
                 day_hours = [
                     self.x[(assignment.id, day, hour)]
                     for assignment in assignments
                     for hour in range(1, HOURS_PER_DAY + 1)
                 ]
-                self.model.add_linear_expression_in_domain(
-                    sum(day_hours),
-                    cp_model.Domain.from_values(LEGAL_DAILY_TEACHING_HOURS),
+                if not uses_flexible_day:
+                    if day not in fully_unavailable:
+                        self.model.add_linear_expression_in_domain(
+                            sum(day_hours), cp_model.Domain.from_values([2, 3, 4, 5])
+                        )
+                    continue
+
+                works_on_day = self.model.new_bool_var(
+                    f"teacher_{teacher_id}_works_day_{day}"
                 )
+                self.model.add(sum(day_hours) >= 2 * works_on_day)
+                self.model.add(sum(day_hours) <= 5 * works_on_day)
+                self.flexible_workdays.append(works_on_day)
+
+            if uses_flexible_day:
+                teacher_workdays = self.flexible_workdays[-DAYS_OF_WEEK:]
+                self.model.add(sum(teacher_workdays) <= DAYS_OF_WEEK - 1)
 
     def _add_at_least_twice_per_week_constraint(self) -> None:
         """
@@ -519,10 +583,10 @@ class ScheduleGenerator:
         objective_terms = [
             coefficient * variable for coefficient, variable in preference_terms
         ]
-        if self.day_off_violations:
-            day_off_weight = preference_upper_bound + 1
-            objective_terms.extend(
-                day_off_weight * violation for violation in self.day_off_violations
+        if self.flexible_workdays:
+            workday_weight = preference_upper_bound + 1
+            objective_terms.append(
+                workday_weight * (len(self.flexible_workdays) - sum(self.flexible_workdays))
             )
 
         if objective_terms:
@@ -560,28 +624,6 @@ class ScheduleGenerator:
                     coefficient = int(middle - distance_from_middle)
                     objective_terms.append((coefficient, self.x[(assignment.id, day, hour)]))
 
-    def _add_flexible_day_off_preferences(self) -> None:
-        """Prefer leaving one solver-selected weekday free for opted-in teachers."""
-        for teacher in self.data.teachers:
-            if not teacher.prefers_day_off or teacher.id not in self.assignments_by_teacher:
-                continue
-
-            assignments = self.assignments_by_teacher[teacher.id]
-            works_on_day = [
-                self.model.new_bool_var(f"teacher_{teacher.id}_works_day_{day}")
-                for day in range(DAYS_OF_WEEK)
-            ]
-            for day, works in enumerate(works_on_day):
-                day_vars = [
-                    self.x[(assignment.id, day, hour)]
-                    for assignment in assignments
-                    for hour in range(1, HOURS_PER_DAY + 1)
-                ]
-                self.model.add(sum(day_vars) <= len(day_vars) * works)
-            violation = self.model.new_bool_var(f"teacher_{teacher.id}_day_off_violation")
-            self.model.add(sum(works_on_day) <= DAYS_OF_WEEK - 1 + violation)
-            self.day_off_violations.append(violation)
-
     def build_model(self) -> None:
         """Build the complete CP model with all variables and constraints."""
         self._create_variables()
@@ -601,7 +643,6 @@ class ScheduleGenerator:
         self._add_at_least_one_lesson_of_two_hours_per_week_constraint()
 
         # Soft constraints (objectives)
-        self._add_flexible_day_off_preferences()
         self._add_preference_objectives()
 
     def solve(self, time_limit_seconds: float = 60.0) -> GeneratedSchedule:

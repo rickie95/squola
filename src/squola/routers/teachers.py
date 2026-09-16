@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from squola.auth import get_current_workspace
 from squola.database import get_db
+from squola.scheduler import fully_unavailable_days
 from squola.models import (
     ClassMatterAssignment,
     FixedClassLesson,
@@ -128,6 +129,18 @@ def update_teacher(
     if teacher_data.schedule_preference is not None:
         teacher.schedule_preference = teacher_data.schedule_preference.value
     if teacher_data.prefers_day_off is not None:
+        if (
+            teacher_data.prefers_day_off
+            and fully_unavailable_days(teacher.unavailabilities, teacher.id)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "A fully unavailable weekday already provides this teacher's "
+                    "day off. Remove the full-day unavailability before enabling "
+                    "a flexible day off."
+                ),
+            )
         teacher.prefers_day_off = teacher_data.prefers_day_off
     
     # Update matters if provided
@@ -252,6 +265,18 @@ def add_unavailability(
         hour_slot=slot_data.hour_slot,
     )
     db.add(slot)
+    existing_day_hours = {
+        unavailable.hour_slot
+        for unavailable in db.scalars(
+            select(TeacherUnavailability).where(
+                TeacherUnavailability.teacher_id == teacher_id,
+                TeacherUnavailability.workspace_id == workspace.id,
+                TeacherUnavailability.day_of_week == slot_data.day_of_week,
+            )
+        ).all()
+    }
+    if existing_day_hours | {slot_data.hour_slot} == set(range(1, 7)):
+        teacher.prefers_day_off = False
     db.commit()
     db.refresh(slot)
     return slot

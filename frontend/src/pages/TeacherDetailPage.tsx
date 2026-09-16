@@ -144,6 +144,7 @@ export default function TeacherDetailPage() {
         <div style={{ padding: "1rem", overflowX: "auto" }}>
           <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
            Clicca su uno slot per renderlo non disponibile. Clicca sul giorno per bloccare/sbloccare tutto il giorno.
+            {teacher.prefers_day_off && " Bloccare tutti gli slot di un giorno annulla automaticamente la richiesta di giorno libero flessibile."}
           </p>
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
             <thead>
