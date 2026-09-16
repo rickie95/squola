@@ -1,7 +1,7 @@
 """Teachers API endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from squola.auth import get_current_workspace
@@ -128,6 +128,7 @@ def update_teacher(
         teacher.email = teacher_data.email
     if teacher_data.schedule_preference is not None:
         teacher.schedule_preference = teacher_data.schedule_preference.value
+    enable_flexible_day_off = False
     if teacher_data.prefers_day_off is not None:
         if (
             teacher_data.prefers_day_off
@@ -141,7 +142,10 @@ def update_teacher(
                     "a flexible day off."
                 ),
             )
-        teacher.prefers_day_off = teacher_data.prefers_day_off
+        if teacher_data.prefers_day_off:
+            enable_flexible_day_off = True
+        else:
+            teacher.prefers_day_off = False
     
     # Update matters if provided
     if teacher_data.matter_ids is not None:
@@ -162,6 +166,36 @@ def update_teacher(
         else:
             teacher.matters = []
     
+    db.flush()
+    if enable_flexible_day_off:
+        full_day_subquery = (
+            select(TeacherUnavailability.day_of_week)
+            .where(
+                TeacherUnavailability.teacher_id == teacher_id,
+                TeacherUnavailability.workspace_id == workspace.id,
+            )
+            .group_by(TeacherUnavailability.day_of_week)
+            .having(func.count(TeacherUnavailability.id) == 6)
+        )
+        result = db.execute(
+            update(Teacher)
+            .where(
+                Teacher.id == teacher_id,
+                Teacher.workspace_id == workspace.id,
+                ~exists(full_day_subquery),
+            )
+            .values(prefers_day_off=True)
+        )
+        if result.rowcount != 1:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "A fully unavailable weekday already provides this teacher's "
+                    "day off. Remove the full-day unavailability before enabling "
+                    "a flexible day off."
+                ),
+            )
+
     db.commit()
     db.refresh(teacher)
     return teacher
@@ -265,18 +299,20 @@ def add_unavailability(
         hour_slot=slot_data.hour_slot,
     )
     db.add(slot)
-    existing_day_hours = {
-        unavailable.hour_slot
-        for unavailable in db.scalars(
-            select(TeacherUnavailability).where(
-                TeacherUnavailability.teacher_id == teacher_id,
-                TeacherUnavailability.workspace_id == workspace.id,
-                TeacherUnavailability.day_of_week == slot_data.day_of_week,
-            )
-        ).all()
-    }
-    if existing_day_hours | {slot_data.hour_slot} == set(range(1, 7)):
-        teacher.prefers_day_off = False
+    db.flush()
+    day_slot_count = db.scalar(
+        select(func.count(TeacherUnavailability.id)).where(
+            TeacherUnavailability.teacher_id == teacher_id,
+            TeacherUnavailability.workspace_id == workspace.id,
+            TeacherUnavailability.day_of_week == slot_data.day_of_week,
+        )
+    )
+    if day_slot_count == 6:
+        db.execute(
+            update(Teacher)
+            .where(Teacher.id == teacher_id, Teacher.workspace_id == workspace.id)
+            .values(prefers_day_off=False)
+        )
     db.commit()
     db.refresh(slot)
     return slot
