@@ -244,6 +244,12 @@ tr:hover {
   gap: 1rem;
 }
 
+.form-error {
+  color: var(--danger-color);
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
 .form-actions {
   display: flex;
   gap: 0.75rem;

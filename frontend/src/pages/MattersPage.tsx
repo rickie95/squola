@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mattersApi } from "../api";
+import { getApiErrorMessage } from "../api/errors";
 import type { Matter, MatterCreate } from "../types";
 import { MatterRequirement, REQUIREMENT_LABELS } from "../types";
 import Modal from "../components/Modal";
@@ -10,6 +11,7 @@ export default function MattersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMatter, setEditingMatter] = useState<Matter | null>(null);
   const [formData, setFormData] = useState<MatterCreate>({ name: "", default_requirements: [] });
+  const [formError, setFormError] = useState<string | null>(null);
 
   const { data: matters, isLoading } = useQuery({
     queryKey: ["matters"],
@@ -22,6 +24,8 @@ export default function MattersPage() {
       queryClient.invalidateQueries({ queryKey: ["matters"] });
       closeModal();
     },
+    onError: (error) =>
+      setFormError(getApiErrorMessage(error, "Non è stato possibile salvare la materia.")),
   });
 
   const updateMutation = useMutation({
@@ -31,6 +35,8 @@ export default function MattersPage() {
       queryClient.invalidateQueries({ queryKey: ["matters"] });
       closeModal();
     },
+    onError: (error) =>
+      setFormError(getApiErrorMessage(error, "Non è stato possibile salvare la materia.")),
   });
 
   const deleteMutation = useMutation({
@@ -41,18 +47,21 @@ export default function MattersPage() {
   });
 
   const openCreateModal = () => {
+    setFormError(null);
     setEditingMatter(null);
     setFormData({ name: "", default_requirements: [] });
     setIsModalOpen(true);
   };
 
   const openEditModal = (matter: Matter) => {
+    setFormError(null);
     setEditingMatter(matter);
     setFormData({ name: matter.name, default_requirements: matter.default_requirements || [] });
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
+    setFormError(null);
     setIsModalOpen(false);
     setEditingMatter(null);
     setFormData({ name: "", default_requirements: [] });
@@ -175,7 +184,7 @@ export default function MattersPage() {
           <div className="form-group">
             <label>Requisiti di default</label>
             <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
-              Questi requisiti verranno applicati ogni volta che assegnerai la materia ad una classe.
+              Questi requisiti valgono per le nuove assegnazioni e vengono applicati anche a quelle già esistenti.
             </p>
             <div className="checkbox-group">
               {Object.values(MatterRequirement).map((req) => (
@@ -200,6 +209,7 @@ export default function MattersPage() {
               ))}
             </div>
           </div>
+          {formError && <p className="form-error">{formError}</p>}
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={closeModal}>
               Annulla

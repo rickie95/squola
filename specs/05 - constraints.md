@@ -15,3 +15,4 @@ There are many types of constraints
 1. a matter must be teached in a class, for a fixed number of hours in a week
 2. matter slots can be grouped in two or three slots
 3. a matter might have additional constraints, specified by tags. The list of additional constrains is fixed.
+4. a matter in a class occupies at most three hours of a day. A tag can tighten that limit to two hours or to one, and the tightest tag present wins

@@ -61,6 +61,64 @@ HOUR_LABELS = [
     "13:00-14:00",
 ]
 
+# Daily cap requirements, mapped to the hours of one assignment they allow in a
+# day. An assignment declaring several is capped by the tightest one, so the two
+# never contradict each other.
+DAILY_CAP_HOURS = {
+    MatterRequirements.MAX_ONE_HOUR_PER_DAY: 1,
+    MatterRequirements.MAX_TWO_HOURS_PER_DAY: 2,
+}
+
+# Requirements demanding a single lesson of a given length. A daily cap below
+# that length makes them impossible to satisfy.
+LESSON_LENGTH_HOURS = {
+    MatterRequirements.ONE_LESSON_OF_TWO_HOURS_PER_WEEK: 2,
+    MatterRequirements.ONE_LESSON_OF_THREE_HOURS_PER_WEEK: 3,
+}
+
+
+def resolve_daily_cap(requirements: list[MatterRequirements] | None) -> int:
+    """Hours of one assignment allowed in a single day: the tightest cap declared."""
+    caps = [DAILY_CAP_HOURS[req] for req in requirements or [] if req in DAILY_CAP_HOURS]
+    return min(caps, default=MAX_DAILY_ASSIGNMENT_HOURS)
+
+
+def requirement_conflict(
+    requirements: list[MatterRequirements] | None,
+    hours_per_week: int | None = None,
+) -> str | None:
+    """
+    Why this combination of requirements can never be scheduled, or None.
+
+    Only arithmetic that holds whatever the rest of the timetable looks like, so
+    that a caller can refuse the write outright. Everything subtler - teacher
+    unavailability, other classes competing for the same slots - stays the
+    solver's to report as INFEASIBLE.
+
+    hours_per_week is optional because a matter declares default requirements
+    without knowing the weekly hours of the assignments that will carry them.
+    """
+    cap = resolve_daily_cap(requirements)
+    longest_lesson = max(
+        (
+            LESSON_LENGTH_HOURS[req]
+            for req in requirements or []
+            if req in LESSON_LENGTH_HOURS
+        ),
+        default=0,
+    )
+    if cap < longest_lesson:
+        return (
+            f"a daily cap of {cap} hour(s) leaves no room for the required "
+            f"lesson of {longest_lesson} hours"
+        )
+    if hours_per_week is not None and hours_per_week > cap * DAYS_OF_WEEK:
+        return (
+            f"{hours_per_week} weekly hours do not fit in {DAYS_OF_WEEK} days "
+            f"capped at {cap} hour(s) each"
+        )
+    return None
+
 
 def fully_unavailable_days(
     unavailabilities: list[TeacherUnavailability], teacher_id: int
@@ -473,6 +531,13 @@ class ScheduleGenerator:
                 elif req == MatterRequirements.ONE_LESSON_OF_TWO_HOURS_PER_WEEK:
                     self.lesson_of_two_hours_per_week_assignments.add(assignment.id)
 
+        # Hours of a single assignment allowed in one day. Without a cap
+        # requirement this is the system-wide MAX_DAILY_ASSIGNMENT_HOURS.
+        self.daily_cap_by_assignment: dict[int, int] = {
+            assignment.id: resolve_daily_cap(assignment.requirements)
+            for assignment in self.data.assignments
+        }
+
     def _create_variables(self) -> None:
         """Create decision variables for the CP model."""
         for assignment in self.data.assignments:
@@ -675,20 +740,22 @@ class ScheduleGenerator:
 
     def _add_daily_assignment_cap_constraint(self) -> None:
         """
-        Constraint: a matter-class assignment occupies at most
-        MAX_DAILY_ASSIGNMENT_HOURS hours in a single day.
+        Constraint: a matter-class assignment occupies at most its daily cap of
+        hours in a single day - MAX_DAILY_ASSIGNMENT_HOURS unless the assignment
+        declares a tighter one.
 
-        Subsumes the previous 4-consecutive-hours rule: a total of 3 hours in a
-        day cannot be 4 consecutive ones. Unlike that rule, this also rejects a
-        day split as 3 hours plus a later extra hour of the same matter.
+        The cap is on the daily total, not on the length of a run: a two-hour
+        cap rejects two consecutive hours plus a third one later the same day.
+        It subsumes the previous 4-consecutive-hours rule.
         """
         for assignment in self.data.assignments:
+            cap = self.daily_cap_by_assignment[assignment.id]
             for day in range(DAYS_OF_WEEK):
                 day_vars = [
                     self.x[(assignment.id, day, hour)]
                     for hour in range(1, HOURS_PER_DAY + 1)
                 ]
-                self.model.add(sum(day_vars) <= MAX_DAILY_ASSIGNMENT_HOURS)
+                self.model.add(sum(day_vars) <= cap)
 
     def _shape_weight(self, base: int, teacher_id: int) -> int:
         """Scale a day-shape weight by the teacher's gap preference."""

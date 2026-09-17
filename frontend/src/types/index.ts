@@ -14,6 +14,8 @@ export const MatterRequirement = {
   AT_LEAST_TWICE_PER_WEEK: "at_least_twice_per_week",
   ONE_LESSON_OF_THREE_HOURS_PER_WEEK: "one_lesson_of_three_hours_per_week",
   ONE_LESSON_OF_TWO_HOURS_PER_WEEK: "one_lesson_of_two_hours_per_week",
+  MAX_ONE_HOUR_PER_DAY: "max_one_hour_per_day",
+  MAX_TWO_HOURS_PER_DAY: "max_two_hours_per_day",
 } as const;
 
 export type MatterRequirement = (typeof MatterRequirement)[keyof typeof MatterRequirement];
@@ -23,6 +25,9 @@ export const REQUIREMENT_LABELS: Record<MatterRequirement, string> = {
   [MatterRequirement.AT_LEAST_TWICE_PER_WEEK]: "Almeno due volte a settimana",
   [MatterRequirement.ONE_LESSON_OF_THREE_HOURS_PER_WEEK]: "Almeno una lezione da 3 ore",
   [MatterRequirement.ONE_LESSON_OF_TWO_HOURS_PER_WEEK]: "Almeno una lezione da 2 ore",
+  // The cap is on the daily total, not on the length of a single lesson.
+  [MatterRequirement.MAX_ONE_HOUR_PER_DAY]: "Max 1 ora al giorno",
+  [MatterRequirement.MAX_TWO_HOURS_PER_DAY]: "Max 2 ore al giorno",
 };
 
 // ============ Matter Types ============

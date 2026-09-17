@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from squola.auth import get_current_workspace
 from squola.database import get_db
+from squola.scheduler import requirement_conflict
 from squola.models import (
     ClassMatterAssignment,
     FixedClassLesson,
@@ -598,6 +599,15 @@ def create_class_assignment(
             detail=f"Matter {matter.name} is already assigned in this class",
         )
 
+    reason = requirement_conflict(
+        assignment_data.requirements, assignment_data.hours_per_week
+    )
+    if reason:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"These requirements cannot be scheduled: {reason}",
+        )
+
     assignment = ClassMatterAssignment(
         workspace_id=workspace.id,
         class_id=class_id,
@@ -650,6 +660,22 @@ def update_class_assignment(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Assignment with id {assignment_id} not found in class {class_id}",
+        )
+
+    # Check the combination this request would leave behind, before any field of
+    # the assignment is touched.
+    reason = requirement_conflict(
+        assignment.requirements
+        if assignment_data.requirements is None
+        else assignment_data.requirements,
+        assignment.hours_per_week
+        if assignment_data.hours_per_week is None
+        else assignment_data.hours_per_week,
+    )
+    if reason:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"These requirements cannot be scheduled: {reason}",
         )
 
     if assignment_data.teacher_id is not None:
