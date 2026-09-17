@@ -77,12 +77,18 @@ def solve(data: SchedulingData):
     return generator.solve()
 
 
-@pytest.mark.parametrize("hours_per_week", [2, 3, 4, 5])
-def test_legal_daily_workloads_are_feasible(hours_per_week: int):
-    schedule = solve(make_data([hours_per_week], unavailable_days={1, 2, 3, 4}))
+@pytest.mark.parametrize(
+    "assignment_hours",
+    # Split across assignments once past the per-assignment daily cap: 4 and 5
+    # hours stay legal for the teacher, just not from a single matter.
+    [[2], [3], [2, 2], [3, 2]],
+    ids=["2h", "3h", "4h", "5h"],
+)
+def test_legal_daily_workloads_are_feasible(assignment_hours: list[int]):
+    schedule = solve(make_data(assignment_hours, unavailable_days={1, 2, 3, 4}))
 
     assert schedule.status == "OPTIMAL"
-    assert len(schedule.slots) == hours_per_week
+    assert len(schedule.slots) == sum(assignment_hours)
     assert {slot.day for slot in schedule.slots} == {0}
 
 

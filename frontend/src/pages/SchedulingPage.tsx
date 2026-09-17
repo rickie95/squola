@@ -505,7 +505,7 @@ export default function SchedulingPage() {
                     </td>
                     <td>
                       <span
-                        className={`status-badge ${s.status === "OPTIMAL" ? "status-success" : "status-warning"}`}
+                        className={`status-badge ${s.status === "OPTIMAL" || s.status === "FEASIBLE" ? "status-success" : "status-warning"}`}
                       >
                         {s.status}
                       </span>
@@ -775,6 +775,25 @@ export default function SchedulingPage() {
               {schedule.metadata.solve_time_seconds.toFixed(3)}s |{" "}
               {schedule.metadata.total_slots} slots
             </p>
+            {schedule.metadata.quality && (
+              <p
+                style={{
+                  fontSize: "0.875rem",
+                  color: "var(--text-secondary)",
+                  marginTop: "0.25rem",
+                }}
+                title={
+                  "FEASIBLE non significa orario peggiore: con questi obiettivi la " +
+                  "qualita' si stabilizza in pochi secondi mentre dimostrare " +
+                  "l'ottimalita' non termina. Guarda questi numeri, non lo stato."
+                }
+              >
+                Qualita': {schedule.metadata.quality.class_blocks} cambi classe |{" "}
+                {schedule.metadata.quality.gap_hours} ore di buco |{" "}
+                {schedule.metadata.quality.long_runs} filate lunghe |{" "}
+                {schedule.metadata.quality.balance_deviation} scostamento carico
+              </p>
+            )}
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <button className="btn btn-secondary" onClick={downloadSchedule}>

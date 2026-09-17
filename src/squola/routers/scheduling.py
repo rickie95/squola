@@ -52,6 +52,7 @@ class ScheduleMetadata(BaseModel):
     solve_time_seconds: float
     generated_at: str
     total_slots: int
+    quality: dict[str, Any] | None = None
 
 
 class ScheduleSlotResponse(BaseModel):

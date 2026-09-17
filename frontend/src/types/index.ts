@@ -171,11 +171,26 @@ export interface ScheduleSlot {
   class?: string;
 }
 
+export interface ScheduleQualityOffender {
+  teacher: string;
+  day: string;
+  value: number;
+}
+
+export interface ScheduleQuality {
+  class_blocks: number;
+  gap_hours: number;
+  long_runs: number;
+  balance_deviation: number;
+  worst: Record<string, ScheduleQualityOffender[]>;
+}
+
 export interface ScheduleMetadata {
   status: string;
   solve_time_seconds: number;
   generated_at: string;
   total_slots: number;
+  quality?: ScheduleQuality | null;
 }
 
 export interface GeneratedSchedule {

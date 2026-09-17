@@ -267,6 +267,45 @@ Controprova sulle giornate corte, dove la frammentazione sarebbe il difetto
 opposto: giornata da 3 ore in una classe, `[L][L][L]` costa 10, `[L][L][ - ][L]`
 costa 10 + 10 + 2 = 22. Il modello non frammenta chi lavora poche ore.
 
+## Misure
+
+Istanza realistica: 6 classi da 30 ore, 8 materie, 10 docenti da 18 ore, 48
+assegnazioni, 180 ore totali, nessuna indisponibilita'. "Prima" e' il modello
+attuale con i pesi di forma azzerati, cioe' l'obiettivo che vedeva un docente
+senza preferenze.
+
+| dimensione | prima | dopo |
+|---|---|---|
+| `class_blocks` | 26 | 1 |
+| `gap_hours` | 53 | 32 |
+| `long_runs` | 16 | 4 |
+| `balance_deviation` | 14 | 5 |
+
+Nessuna dimensione e' sacrificata: i pesi di D7 restano quelli tarati sui tre
+casi utente, nessuna ritaratura necessaria. `gap_hours` e' la dimensione che
+migliora di meno (-40%) ed e' atteso: la banda produce giornate da 3-4 ore, e una
+giornata da 4 ore prende un'ora di stacco per costruzione. 32 ore di buco su 50
+giornate-docente sono ~0,64 al giorno, cioe' il comportamento voluto.
+
+Qualita' in funzione del budget di tempo, come somma pesata delle quattro
+dimensioni (piu' basso e' meglio):
+
+| budget | 15s | 30s | 60s | 120s |
+|---|---|---|---|---|
+| somma pesata | 302 | 208 | 204 | 176 |
+
+La qualita' **non** e' in plateau a 120s: il limite attuale e' giustificato e non
+va abbassato. Il plateau immediato osservato su una fixture di test da 6 classi
+intercambiabili e' un effetto della sua simmetria, non del modello.
+
+`num_search_workers` resta a **4**: su quattro esecuzioni a 120s con 8 worker la
+somma pesata e' 222, 146, 200, 206 (media ~193) contro 178, 140, 176 (media ~165)
+con 4 worker. La varianza fra esecuzioni e' ampia e gli intervalli si
+sovrappongono, ma non c'e' alcuna evidenza che 8 worker aiutino.
+
+Lo stato resta `FEASIBLE` in tutte le esecuzioni: CP-SAT non dimostra
+l'ottimalita' entro il limite. Vedi la nota sui rischi.
+
 ## Migration Plan
 
 Nessuna migrazione dati: nessuna modifica di schema, l'enum `SchedulePreference`
