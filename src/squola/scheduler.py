@@ -1082,7 +1082,7 @@ class ScheduleGenerator:
         """
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = time_limit_seconds
-        solver.parameters.num_search_workers = 12
+        solver.parameters.num_search_workers = 16
 
         status = solver.Solve(self.model)
 
