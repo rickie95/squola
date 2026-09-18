@@ -36,5 +36,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 EXPOSE 8000
 
+RUN mkdir /app/db
+
 # Run migrations then start the server
 CMD ["sh", "-c", "alembic upgrade head && uvicorn squola.main:app --host 0.0.0.0 --port 8000"]
