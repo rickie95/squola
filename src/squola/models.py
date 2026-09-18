@@ -38,6 +38,10 @@ class MatterRequirements(str, Enum):
     AT_LEAST_TWICE_PER_WEEK = "at_least_twice_per_week"
     ONE_LESSON_OF_THREE_HOURS_PER_WEEK = "one_lesson_of_three_hours_per_week"
     ONE_LESSON_OF_TWO_HOURS_PER_WEEK = "one_lesson_of_two_hours_per_week"
+    # Daily caps, on the total hours of one assignment in a day. Declaring none
+    # leaves the assignment at the system-wide cap.
+    MAX_ONE_HOUR_PER_DAY = "max_one_hour_per_day"
+    MAX_TWO_HOURS_PER_DAY = "max_two_hours_per_day"
 
 
 class WorkspaceRole(str, Enum):

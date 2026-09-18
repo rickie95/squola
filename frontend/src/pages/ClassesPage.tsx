@@ -2,6 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { classesApi, mattersApi, teachersApi } from "../api";
+import { getApiErrorMessage } from "../api/errors";
 import type {
   SchoolClass,
   SchoolClassWithAssignments,
@@ -45,6 +46,7 @@ export default function ClassesPage() {
   });
   const [editingAssignment, setEditingAssignment] = useState<ClassMatterAssignment | null>(null);
   const [fixedLessonError, setFixedLessonError] = useState<string | null>(null);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
   const { data: classes, isLoading: classesLoading } = useQuery({
     queryKey: ["classes"],
@@ -106,6 +108,10 @@ export default function ClassesPage() {
       }
       closeAssignmentModal();
     },
+    onError: (error) =>
+      setAssignmentError(
+        getApiErrorMessage(error, "Non è stato possibile salvare l'assegnazione."),
+      ),
   });
 
   const updateAssignmentMutation = useMutation({
@@ -117,6 +123,10 @@ export default function ClassesPage() {
       }
       closeAssignmentModal();
     },
+    onError: (error) =>
+      setAssignmentError(
+        getApiErrorMessage(error, "Non è stato possibile salvare l'assegnazione."),
+      ),
   });
 
   const deleteAssignmentMutation = useMutation({
@@ -203,6 +213,7 @@ export default function ClassesPage() {
   };
 
   const openAssignmentModal = (matter?: Matter) => {
+    setAssignmentError(null);
     setEditingAssignment(null);
     const defaultReqs = matter?.default_requirements || [];
     setAssignmentFormData({
@@ -215,6 +226,7 @@ export default function ClassesPage() {
   };
 
   const openEditAssignmentModal = (assignment: ClassMatterAssignment) => {
+    setAssignmentError(null);
     setEditingAssignment(assignment);
     setAssignmentFormData({
       matter_id: assignment.matter_id,
@@ -226,6 +238,7 @@ export default function ClassesPage() {
   };
 
   const closeAssignmentModal = () => {
+    setAssignmentError(null);
     setIsAssignmentModalOpen(false);
     setEditingAssignment(null);
     setAssignmentFormData({
@@ -737,6 +750,8 @@ export default function ClassesPage() {
               ))}
             </div>
           </div>
+
+          {assignmentError && <p className="form-error">{assignmentError}</p>}
 
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={closeAssignmentModal}>

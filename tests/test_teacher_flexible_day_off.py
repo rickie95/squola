@@ -134,24 +134,27 @@ def test_preview_and_generation_explain_infeasible_flexible_day_load(client: Tes
         "/api/auth/register",
         json={"username": "alice", "password": "alice-password12"},
     )
-    matter = client.post(
-        "/api/matters", json={"name": "Italiano", "default_requirements": []}
-    ).json()
     teacher = client.post(
         "/api/teachers",
         json={"first_name": "Alice", "last_name": "Rossi", "prefers_day_off": True},
     ).json()
     school_class = client.post("/api/classes", json={"year": "1", "section": "A"}).json()
-    assignment = client.post(
-        f"/api/classes/{school_class['id']}/assignments",
-        json={
-            "matter_id": matter["id"],
-            "teacher_id": teacher["id"],
-            "hours_per_week": 21,
-            "requirements": [],
-        },
-    )
-    assert assignment.status_code == 201
+    # 22 hours is more than the 20 a flexible day off leaves, split over two
+    # assignments because no single one may exceed the daily cap over five days.
+    for name in ("Italiano", "Storia"):
+        matter = client.post(
+            "/api/matters", json={"name": name, "default_requirements": []}
+        ).json()
+        assignment = client.post(
+            f"/api/classes/{school_class['id']}/assignments",
+            json={
+                "matter_id": matter["id"],
+                "teacher_id": teacher["id"],
+                "hours_per_week": 11,
+                "requirements": [],
+            },
+        )
+        assert assignment.status_code == 201, assignment.text
 
     preview = client.get("/api/scheduling/preview")
     generated = client.post("/api/scheduling/generate", json={"time_limit_seconds": 3})

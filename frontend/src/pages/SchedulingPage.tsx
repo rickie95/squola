@@ -152,7 +152,7 @@ export default function SchedulingPage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("by_class");
-  const [timeLimit, setTimeLimit] = useState(30);
+  const [timeLimit, setTimeLimit] = useState(120);
   const [nickname, setNickname] = useState("");
   const [editingNickname, setEditingNickname] = useState<number | null>(null);
   const [newNickname, setNewNickname] = useState("");
@@ -505,7 +505,7 @@ export default function SchedulingPage() {
                     </td>
                     <td>
                       <span
-                        className={`status-badge ${s.status === "OPTIMAL" ? "status-success" : "status-warning"}`}
+                        className={`status-badge ${s.status === "OPTIMAL" || s.status === "FEASIBLE" ? "status-success" : "status-warning"}`}
                       >
                         {s.status}
                       </span>
@@ -775,6 +775,28 @@ export default function SchedulingPage() {
               {schedule.metadata.solve_time_seconds.toFixed(3)}s |{" "}
               {schedule.metadata.total_slots} slots
             </p>
+            {schedule.metadata.quality && (
+              <p
+                style={{
+                  fontSize: "0.875rem",
+                  color: "var(--text-secondary)",
+                  marginTop: "0.25rem",
+                }}
+                title={
+                  "Ore di buco di troppo: ogni giornata da almeno 4 ore ha " +
+                  "diritto a un'ora di stacco, le giornate piu' corte a nessuna. " +
+                  "Questo numero conta solo le ore oltre quel limite e dovrebbe " +
+                  "essere zero. FEASIBLE non significa orario peggiore: guarda " +
+                  "questi numeri, non lo stato."
+                }
+              >
+                Qualita': {schedule.metadata.quality.class_blocks} cambi classe |{" "}
+                {schedule.metadata.quality.excess_gap_hours} ore di buco di troppo |{" "}
+                {schedule.metadata.quality.break_days} stacchi |{" "}
+                {schedule.metadata.quality.long_runs} filate lunghe |{" "}
+                {schedule.metadata.quality.balance_deviation} scostamento carico
+              </p>
+            )}
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <button className="btn btn-secondary" onClick={downloadSchedule}>

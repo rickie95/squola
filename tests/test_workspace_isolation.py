@@ -66,3 +66,54 @@ def test_workspace_data_isolation(client: TestClient):
         json={"hours_per_week": 2},
     )
     assert cross_update_assignment.status_code == 404
+
+
+def test_default_requirement_propagation_stays_in_its_workspace(client: TestClient):
+    """A matter of the same name in another workspace is a different matter."""
+
+    def setup_assignment() -> tuple[int, int, int]:
+        matter_id = client.post(
+            "/api/matters",
+            json={"name": "Matematica", "default_requirements": []},
+        ).json()["id"]
+        teacher_id = client.post(
+            "/api/teachers", json={"first_name": "T", "last_name": "T"}
+        ).json()["id"]
+        class_id = client.post(
+            "/api/classes", json={"year": "I", "section": "A"}
+        ).json()["id"]
+        assignment_id = client.post(
+            f"/api/classes/{class_id}/assignments",
+            json={
+                "matter_id": matter_id,
+                "teacher_id": teacher_id,
+                "hours_per_week": 4,
+                "requirements": [],
+            },
+        ).json()["id"]
+        return matter_id, class_id, assignment_id
+
+    def requirements_of(class_id: int, assignment_id: int) -> list[str]:
+        body = client.get(f"/api/classes/{class_id}").json()
+        return next(
+            a["requirements"]
+            for a in body["matter_assignments"]
+            if a["id"] == assignment_id
+        )
+
+    register(client, "bob", "bob-password-123")
+    _, bob_class, bob_assignment = setup_assignment()
+    client.post("/api/auth/logout")
+
+    register(client, "alice", "alice-password12")
+    alice_matter, alice_class, alice_assignment = setup_assignment()
+    pushed = client.put(
+        f"/api/matters/{alice_matter}",
+        json={"default_requirements": ["max_two_hours_per_day"]},
+    )
+    assert pushed.status_code == 200, pushed.text
+    assert requirements_of(alice_class, alice_assignment) == ["max_two_hours_per_day"]
+    client.post("/api/auth/logout")
+
+    login(client, "bob", "bob-password-123")
+    assert requirements_of(bob_class, bob_assignment) == []

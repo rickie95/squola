@@ -5,6 +5,9 @@ There are many types of constraints
 ## Teachers
 1. a teacher cannot work in two classes in the same schedule slot
 2. a teacher has a fixed number of hours to work in a single week
+3. a teacher's day holds at most one gap hour, and only a day of four hours or
+   more earns it. A shorter day has no gap at all. Hours the teacher is
+   unavailable for are not gaps: they are not at school and are not waiting.
 
 
 ## Classes
@@ -15,3 +18,4 @@ There are many types of constraints
 1. a matter must be teached in a class, for a fixed number of hours in a week
 2. matter slots can be grouped in two or three slots
 3. a matter might have additional constraints, specified by tags. The list of additional constrains is fixed.
+4. a matter in a class occupies at most three hours of a day. A tag can tighten that limit to two hours or to one, and the tightest tag present wins
