@@ -10,4 +10,4 @@ services:
     image: squola/be
     build: .
     volumes:
-      - ~/squolabk/current.db:/app/db/
+      - ~/squolabk/current.db:/app/db/squola.db
