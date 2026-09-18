@@ -783,13 +783,16 @@ export default function SchedulingPage() {
                   marginTop: "0.25rem",
                 }}
                 title={
-                  "FEASIBLE non significa orario peggiore: con questi obiettivi la " +
-                  "qualita' si stabilizza in pochi secondi mentre dimostrare " +
-                  "l'ottimalita' non termina. Guarda questi numeri, non lo stato."
+                  "Ore di buco di troppo: ogni giornata da almeno 4 ore ha " +
+                  "diritto a un'ora di stacco, le giornate piu' corte a nessuna. " +
+                  "Questo numero conta solo le ore oltre quel limite e dovrebbe " +
+                  "essere zero. FEASIBLE non significa orario peggiore: guarda " +
+                  "questi numeri, non lo stato."
                 }
               >
                 Qualita': {schedule.metadata.quality.class_blocks} cambi classe |{" "}
-                {schedule.metadata.quality.gap_hours} ore di buco |{" "}
+                {schedule.metadata.quality.excess_gap_hours} ore di buco di troppo |{" "}
+                {schedule.metadata.quality.break_days} stacchi |{" "}
                 {schedule.metadata.quality.long_runs} filate lunghe |{" "}
                 {schedule.metadata.quality.balance_deviation} scostamento carico
               </p>

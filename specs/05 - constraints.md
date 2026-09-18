@@ -5,6 +5,9 @@ There are many types of constraints
 ## Teachers
 1. a teacher cannot work in two classes in the same schedule slot
 2. a teacher has a fixed number of hours to work in a single week
+3. a teacher's day holds at most one gap hour, and only a day of four hours or
+   more earns it. A shorter day has no gap at all. Hours the teacher is
+   unavailable for are not gaps: they are not at school and are not waiting.
 
 
 ## Classes

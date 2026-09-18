@@ -1,5 +1,35 @@
 ## MODIFIED Requirements
 
+### Requirement: Le filate di lezione consecutive sono limitate
+A parita' di vincoli hard soddisfatti, il sistema SHALL preferire gli orari che
+evitano filate di quattro o piu' ore di lezione consecutive per un docente in una
+giornata, indipendentemente dalle classi coinvolte. Il sistema SHALL penalizzare
+una filata di cinque ore piu' di una filata di quattro. Per un docente con
+preferenza di raggruppamento il sistema SHALL applicare questo criterio alle sole
+filate di cinque ore: in una giornata da quattro ore la preferenza di
+raggruppamento SHALL prevalere e il sistema SHALL generare le quattro ore
+consecutive.
+
+#### Scenario: Giornata da quattro ore
+- **WHEN** un docente senza preferenza di raggruppamento ha quattro ore in un giorno e i vincoli hard consentono sia quattro ore consecutive sia due blocchi da due separati da un'ora libera
+- **THEN** il sistema genera la disposizione con l'ora libera intermedia
+
+#### Scenario: Giornata da quattro ore con preferenza di raggruppamento
+- **WHEN** un docente con preferenza di raggruppamento ha quattro ore in un giorno e i vincoli hard consentono sia quattro ore consecutive sia due blocchi da due separati da un'ora libera
+- **THEN** il sistema genera le quattro ore consecutive
+
+#### Scenario: Giornata da cinque ore
+- **WHEN** un docente ha cinque ore in un giorno e i vincoli hard consentono di collocare un'ora libera all'interno della giornata
+- **THEN** il sistema genera una disposizione con un'ora libera intermedia anziche' cinque ore consecutive
+
+#### Scenario: Giornata da cinque ore con preferenza di raggruppamento
+- **WHEN** un docente con preferenza di raggruppamento ha cinque ore in un giorno e i vincoli hard consentono di collocare un'ora libera all'interno della giornata
+- **THEN** il sistema genera comunque la disposizione con l'ora libera intermedia
+
+#### Scenario: Giornata da tre ore
+- **WHEN** un docente ha tre ore in un giorno e i vincoli hard consentono di renderle consecutive
+- **THEN** il sistema genera le tre ore consecutive senza introdurre ore libere intermedie
+
 ### Requirement: I buchi oltre il primo sono fortemente penalizzati
 Il sistema SHALL calcolare come buco ogni slot senza lezione compreso fra due slot
 con lezione dello stesso docente nello stesso giorno, **escludendo gli slot in cui
@@ -82,8 +112,8 @@ criterio di contiguita' delle ore della stessa classe.
 - **THEN** il sistema non genera per lui alcuna giornata con piu' di un'ora di buco, ne' alcuna ora di buco in una giornata corta
 
 #### Scenario: Preferenza di raggruppamento
-- **WHEN** un docente ha impostato la preferenza di raggruppamento delle lezioni
-- **THEN** il sistema riduce per lui il numero di giornate con un'ora di buco rispetto a un docente senza preferenza, a parita' di ogni altra condizione
+- **WHEN** un docente ha impostato la preferenza di raggruppamento delle lezioni e una sua giornata ammette sia una disposizione contigua sia una con l'ora di stacco
+- **THEN** il sistema genera la disposizione contigua ogni volta che la filata che ne risulta non raggiunge le cinque ore, riducendo cosi' il numero di giornate con un'ora di buco rispetto a un docente senza preferenza
 
 #### Scenario: Le preferenze sui buchi non toccano la contiguita' delle classi
 - **WHEN** due docenti con lo stesso orario di lezione hanno preferenze sui buchi diverse

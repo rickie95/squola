@@ -33,24 +33,41 @@ MAX_DAILY_ASSIGNMENT_HOURS = 3  # hours of one matter-class assignment in one da
 LONG_RUN_WINDOW = 4  # consecutive teaching hours that start to hurt
 
 # Objective weights. Only relative magnitudes matter: the solver compares
-# alternatives, never absolute costs. W_LONG_RUN has to stay above
-# W_GAP + 2 * W_TIME_PREFERENCE, otherwise buying the one-hour break in a
-# four-hour day never pays off for a teacher with a time preference.
+# alternatives, never absolute costs.
 W_DAILY_BALANCE = 16
-W_EXTRA_GAP = 12
 W_CLASS_BLOCK = 10
+W_BREAK_DAY_STRICT = 8  # cost of the allowed break for a grouping preference
 W_LONG_RUN = 6
-W_GAP = 2
+W_BREAK_DAY = 1  # cost of the allowed break for everyone else
 W_TIME_PREFERENCE = 1
 
-assert W_LONG_RUN > W_GAP + 2 * W_TIME_PREFERENCE
+# In a day that earns the allowance the break always removes at least one long
+# run, because four hours without a gap in six slots have to be consecutive. So
+# the break is worth W_LONG_RUN in a four-hour day and twice that in a five-hour
+# one, and the two weights sit on either side of the smaller gain: the ordinary
+# break stays worth buying in both, the grouping preference drops it in the
+# four-hour day only. Checked here so that retuning W_LONG_RUN cannot silently
+# collapse one of the two behaviours.
+assert W_LONG_RUN > W_BREAK_DAY + 2 * W_TIME_PREFERENCE
+assert (
+    W_LONG_RUN
+    < W_BREAK_DAY_STRICT + 2 * W_TIME_PREFERENCE
+    < 2 * W_LONG_RUN
+)
 
-# Gap-related preferences attenuate or amplify the day-shape weights; they never
-# flip their sign. Percentages keep the arithmetic integral.
-SHAPE_SENSITIVITY_PERCENT = {
-    SchedulePreference.MINIMIZE_GAPS.value: 200,
-    SchedulePreference.MAXIMIZE_GAPS.value: 50,
-}
+# Past the day's allowance a gap hour has to cost more than every other term can
+# gain over a whole week, so that no other criterion can ever buy a second one.
+# Derived from the other weights rather than tuned, because a hand-picked number
+# drifts as soon as one of them changes. The weekly factor is not caution: moving
+# a lesson to open a gap on one day also changes another, so a per-day bound
+# would be an estimate instead of a proof.
+W_EXCESS_GAP = 1 + DAYS_OF_WEEK * (
+    HOURS_PER_DAY * W_CLASS_BLOCK
+    + (HOURS_PER_DAY - LONG_RUN_WINDOW + 1) * W_LONG_RUN
+    + HOURS_PER_DAY * W_DAILY_BALANCE
+    + sum(W_TIME_PREFERENCE * (hour - 1) for hour in range(1, HOURS_PER_DAY + 1))
+    + max(W_BREAK_DAY, W_BREAK_DAY_STRICT)
+)
 DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 HOUR_LABELS = [
     "08:00-09:00",
@@ -302,12 +319,23 @@ def daily_band(total_hours: int, workdays: int) -> tuple[int, int]:
     )
 
 
-QUALITY_DIMENSIONS = ("class_blocks", "gap_hours", "long_runs", "balance_deviation")
+QUALITY_DIMENSIONS = (
+    "class_blocks",
+    "excess_gap_hours",
+    "long_runs",
+    "balance_deviation",
+)
+# Reported as totals but kept out of the worst list: a day served the way its
+# teacher asked for is not an offender, and ranking it as one would bury the
+# real defects.
+QUALITY_INFO_DIMENSIONS = ("break_days", "missed_break_days")
 QUALITY_WORST_ENTRIES = 5
 
 
 def compute_quality_metrics(
-    slots: list[ScheduleSlot], eligible_workdays: dict[int, int]
+    slots: list[ScheduleSlot],
+    eligible_workdays: dict[int, int],
+    unavailable: set[tuple[int, int, int]] | None = None,
 ) -> dict[str, Any]:
     """
     Score a timetable on the dimensions the day-shape objective optimises.
@@ -316,8 +344,11 @@ def compute_quality_metrics(
     same numbers can be computed for any timetable and asserted in tests without
     building a model. `eligible_workdays` maps a teacher to the weekdays they can
     teach on; it cannot be recovered from the slots, and using the days actually
-    taught would score a concentrated week as perfectly balanced.
+    taught would score a concentrated week as perfectly balanced. `unavailable`
+    holds the (teacher, day, hour) slots a teacher cannot teach in, for the same
+    reason: without it these numbers would count gaps the solver never charged.
     """
+    unavailable = unavailable or set()
     by_teacher_day: dict[tuple[int, int], dict[int, int]] = {}
     teacher_names: dict[int, str] = {}
     weekly_hours: dict[int, int] = {}
@@ -334,15 +365,24 @@ def compute_quality_metrics(
             1 for hour in hours if class_by_hour.get(hour - 1) != class_by_hour[hour]
         )
         occupied = set(hours)
+        teacher_id, day = key
+        # Only free slots between two lessons count, and only those the teacher
+        # could have taught in: before the first and after the last lesson they
+        # are not at school, and in an unavailable slot they cannot be.
+        gap_hours = sum(
+            1
+            for hour in range(hours[0], hours[-1] + 1)
+            if hour not in occupied and (teacher_id, day, hour) not in unavailable
+        )
+        # A day long enough to be worth breaking is allowed one gap hour.
+        allowance = 1 if len(occupied) >= LONG_RUN_WINDOW else 0
         per_day[key] = {
             # Starts beyond the number of distinct classes: the unavoidable
             # minimum for that day's classes is not a defect.
             "class_blocks": starts - len(set(class_by_hour.values())),
-            # Only free slots between two lessons count; before the first and
-            # after the last lesson the teacher is simply not at school.
-            "gap_hours": sum(
-                1 for hour in range(hours[0], hours[-1] + 1) if hour not in occupied
-            ),
+            "excess_gap_hours": max(0, gap_hours - allowance),
+            "break_days": 1 if gap_hours else 0,
+            "missed_break_days": 1 if allowance and not gap_hours else 0,
             "long_runs": sum(
                 1
                 for start in range(1, HOURS_PER_DAY - LONG_RUN_WINDOW + 2)
@@ -363,7 +403,7 @@ def compute_quality_metrics(
 
     totals = {
         dimension: sum(values[dimension] for values in per_day.values())
-        for dimension in QUALITY_DIMENSIONS
+        for dimension in QUALITY_DIMENSIONS + QUALITY_INFO_DIMENSIONS
     }
     worst = {}
     for dimension in QUALITY_DIMENSIONS:
@@ -757,11 +797,6 @@ class ScheduleGenerator:
                 ]
                 self.model.add(sum(day_vars) <= cap)
 
-    def _shape_weight(self, base: int, teacher_id: int) -> int:
-        """Scale a day-shape weight by the teacher's gap preference."""
-        preference = self.preference_by_teacher.get(teacher_id)
-        return base * SHAPE_SENSITIVITY_PERCENT.get(preference, 100) // 100
-
     def _teacher_day_hours(
         self, assignments: list[ClassMatterAssignment], day: int, hour: int
     ) -> Any:
@@ -824,7 +859,6 @@ class ScheduleGenerator:
         between classes and the same class picked up again after a break.
         """
         for teacher_id, by_class in self.assignments_by_teacher_class.items():
-            weight = self._shape_weight(W_CLASS_BLOCK, teacher_id)
             for class_id, assignments in by_class.items():
                 for day in range(DAYS_OF_WEEK):
                     for hour in range(1, HOURS_PER_DAY + 1):
@@ -838,18 +872,25 @@ class ScheduleGenerator:
                             f"start_t{teacher_id}_c{class_id}_d{day}_h{hour}"
                         )
                         self.model.add(start >= here - previous)
-                        terms.append((weight, start))
+                        terms.append((W_CLASS_BLOCK, start))
 
     def _add_gap_terms(self, terms: list[tuple[int, cp_model.IntVar]]) -> None:
         """
         Penalise free slots sandwiched between lessons of the same teacher.
 
-        The first gap hour of a day is cheap on purpose - teachers want one break
-        in a long day - while every further gap hour is expensive.
+        A day long enough to be worth breaking gets an allowance of one gap hour;
+        every hour past it costs more than the rest of the objective can gain in
+        a whole week, so a second one is never worth buying. Short days get no
+        allowance at all, and that is where the proportionality between workload
+        and gaps comes from: a teacher with few hours only has short days, so the
+        model gives them no gaps without ever mentioning their weekly total.
+
+        Slots the teacher is unavailable for are not gaps. They are not at school
+        and are not waiting, so only the free time in which they could have been
+        teaching counts.
         """
         for teacher_id, assignments in self.assignments_by_teacher.items():
-            gap_weight = self._shape_weight(W_GAP, teacher_id)
-            extra_weight = self._shape_weight(W_EXTRA_GAP, teacher_id)
+            preference = self.preference_by_teacher.get(teacher_id)
 
             for day in range(DAYS_OF_WEEK):
                 occupied = {
@@ -876,18 +917,74 @@ class ScheduleGenerator:
 
                 day_gaps = []
                 for hour in range(1, HOURS_PER_DAY + 1):
+                    if (teacher_id, day, hour) in self.unavailable:
+                        continue
                     gap = self.model.new_bool_var(f"gap_t{teacher_id}_d{day}_h{hour}")
                     self.model.add(
                         gap >= before[hour] + after[hour] - occupied[hour] - 1
                     )
                     day_gaps.append(gap)
-                    terms.append((gap_weight, gap))
+                if not day_gaps:
+                    continue
 
-                extra = self.model.new_int_var(
-                    0, HOURS_PER_DAY, f"extra_gap_t{teacher_id}_d{day}"
+                # The allowance is read off the day's load, not its layout, so it
+                # is not circular: a four-hour day earns it whether it is laid
+                # out as one run or as two blocks, and the comparison decides.
+                load = sum(occupied.values())
+                allowance = self.model.new_bool_var(f"allow_t{teacher_id}_d{day}")
+                self.model.add(load >= LONG_RUN_WINDOW).only_enforce_if(allowance)
+                self.model.add(load < LONG_RUN_WINDOW).only_enforce_if(
+                    allowance.negated()
                 )
-                self.model.add(extra >= sum(day_gaps) - 1)
-                terms.append((extra_weight, extra))
+
+                excess = self.model.new_int_var(
+                    0, HOURS_PER_DAY, f"excess_gap_t{teacher_id}_d{day}"
+                )
+                self.model.add(excess >= sum(day_gaps) - allowance)
+                terms.append((W_EXCESS_GAP, excess))
+
+                self._add_break_day_term(
+                    terms, teacher_id, day, preference, day_gaps, allowance
+                )
+
+    def _add_break_day_term(
+        self,
+        terms: list[tuple[int, cp_model.IntVar]],
+        teacher_id: int,
+        day: int,
+        preference: str | None,
+        day_gaps: list[cp_model.IntVar],
+        allowance: cp_model.IntVar,
+    ) -> None:
+        """
+        Charge the one break a day is allowed, according to the teacher's gap
+        preference.
+
+        The preference acts on how many days of the week carry their break, not
+        on how deep a single day is cut: no preference can exceed a day's
+        allowance, so "more gaps" is only ever expressible as "more days with the
+        one gap". Summed over the week, that is exactly the weekly reading
+        teachers give these preferences.
+        """
+        break_day = self.model.new_bool_var(f"break_t{teacher_id}_d{day}")
+        self.model.add(sum(day_gaps) >= 1).only_enforce_if(break_day)
+        self.model.add(sum(day_gaps) == 0).only_enforce_if(break_day.negated())
+
+        if preference == SchedulePreference.MAXIMIZE_GAPS.value:
+            # Anchoring to the allowance does double duty: on a short day the
+            # term is identically zero, so the preference never pushes towards a
+            # gap that would cost W_EXCESS_GAP.
+            missed = self.model.new_bool_var(f"missed_break_t{teacher_id}_d{day}")
+            self.model.add(missed >= allowance - break_day)
+            terms.append((W_BREAK_DAY, missed))
+            return
+
+        weight = (
+            W_BREAK_DAY_STRICT
+            if preference == SchedulePreference.MINIMIZE_GAPS.value
+            else W_BREAK_DAY
+        )
+        terms.append((weight, break_day))
 
     def _add_long_run_terms(self, terms: list[tuple[int, cp_model.IntVar]]) -> None:
         """
@@ -1004,7 +1101,7 @@ class ScheduleGenerator:
         if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             schedule.slots = self._extract_solution(solver)
             schedule.quality = compute_quality_metrics(
-                schedule.slots, self.eligible_workdays
+                schedule.slots, self.eligible_workdays, self.unavailable
             )
 
         return schedule

@@ -146,6 +146,33 @@ preferenza di distribuzione chiede uno stacco al giorno su tutta la settimana, e
 non puo' chiedere altro perche' la seconda ora di buco e' fuori portata per
 chiunque.
 
+La calibrazione dei due pesi non e' libera. Nelle sole giornate che maturano la
+franchigia lo stacco elimina sempre almeno una filata lunga, perche' quattro ore
+senza buco in sei slot sono necessariamente consecutive:
+
+```
+  4 ore senza stacco -> 1 finestra = W_LONG_RUN      guadagno dello stacco:  6
+  5 ore senza stacco -> 2 finestre = 2 * W_LONG_RUN  guadagno dello stacco: 12
+```
+
+`W_BREAK_DAY` deve quindi restare sotto il guadagno minore, altrimenti nessun
+docente prenderebbe mai lo stacco e la franchigia sarebbe lettera morta.
+`W_BREAK_DAY_STRICT` si colloca invece **fra i due guadagni**: il docente con
+preferenza di raggruppamento tiene le quattro ore consecutive e spezza solo la
+giornata da cinque. Con `W_TIME_PREFERENCE = 1` e uno spostamento di fascia di al
+piu' due unita':
+
+```
+  W_BREAK_DAY        + 2 <  6      ->  W_BREAK_DAY = 1
+  6 <  W_BREAK_DAY_STRICT + 2 < 12  ->  W_BREAK_DAY_STRICT = 8
+```
+
+Questa e' l'unica banda in cui la preferenza di raggruppamento produce un effetto
+osservabile: sotto il guadagno minore si comporta come l'assenza di preferenza,
+sopra il maggiore elimina lo stacco anche dalle giornate da cinque ore, che
+nessuno ha chiesto. Il requisito sulle filate lunghe viene modificato di
+conseguenza, per esentare quella preferenza dalla giornata da quattro ore.
+
 Ancorare il ramo `MAXIMIZE_GAPS` ad `allowance` fa doppio lavoro: nelle giornate
 corte il termine e' identicamente zero, quindi la preferenza non spinge verso un
 buco che costerebbe `W_EXCESS_GAP`, e non serve una regola esplicita per il caso.
@@ -168,10 +195,19 @@ lo stacco nella giornata da quattro ore non veniva mai comprato e l'assert
 passava lo stesso.
 
 Con `_shape_weight` rimosso il peso e' uniforme e il confronto torna
-significativo, ma la relazione va comunque riscritta sulle costanti nuove: nella
-giornata che matura la franchigia lo stacco deve convenire, quindi
-`W_LONG_RUN` deve superare quanto lo stacco costa in quella giornata sommato allo
-spostamento di fascia oraria che comporta.
+significativo, ma la relazione va riscritta sulle costanti nuove e sdoppiata,
+perche' i due pesi sullo stacco hanno ora soglie diverse:
+
+```
+W_LONG_RUN     > W_BREAK_DAY        + 2 * W_TIME_PREFERENCE
+2 * W_LONG_RUN > W_BREAK_DAY_STRICT + 2 * W_TIME_PREFERENCE > W_LONG_RUN
+```
+
+La prima riga garantisce lo stacco nella giornata da quattro ore a chi non ha
+preferenza di raggruppamento; la seconda colloca `W_BREAK_DAY_STRICT` nella banda
+in cui quella preferenza agisce sulle sole giornate da cinque ore. Entrambe vanno
+verificate da un assert di modulo, cosi' che una futura ritaratura di
+`W_LONG_RUN` non le rompa in silenzio.
 
 ### 6. `compute_quality_metrics` riceve le indisponibilita'
 
@@ -183,10 +219,26 @@ la diagnostica conterebbe buchi che il solver non penalizza.
 
 ## Risks / Trade-offs
 
-**Il peso dominante irrigidisce una sola dimensione e puo' allungare la
-soluzione** -> La generazione e' gia' passata da soddisfacibilita' a
-ottimizzazione con `improve-schedule-quality`, e `FEASIBLE` e' gia' la norma. Va
-comunque misurato il tempo su un carico realistico prima e dopo, non assunto.
+**Il peso dominante irrigidisce una sola dimensione e rallenta la convergenza**
+-> Misurato su 18 docenti, 15 classi, 108 assegnazioni, 360 ore. La costruzione
+del modello non cambia (0,25s prima, 0,27s dopo) e l'esito resta `FEASIBLE` in
+entrambi i casi, ma il resto dell'obiettivo converge piu' lentamente perche' il
+solver spende il budget sulla dimensione dominante:
+
+```
+                     prima      dopo @30s   dopo @120s
+  ore di buco          74            -            -
+  excess_gap_hours      -            0            0
+  class_blocks          6           11            6
+  long_runs            17           36           25
+```
+
+A 30 secondi la qualita' sulle dimensioni minori e' visibilmente peggiore; a 120
+secondi `class_blocks` torna al valore precedente e `long_runs` recupera in gran
+parte. La differenza residua sulle filate lunghe e' in parte voluta: i docenti con
+preferenza di raggruppamento ora tengono le quattro ore consecutive per
+costruzione. Chi genera con un budget breve va avvisato che la resa peggiora, il
+che rende la scomposizione delle metriche non solo utile ma necessaria.
 
 **I test esistenti usano `time_limit_seconds: 3`** -> Con un termine dominante il
 solver puo' impiegare piu' tempo a chiudere il gap e restituire soluzioni

@@ -2,7 +2,12 @@
 
 from fastapi.testclient import TestClient
 
-from squola.scheduler import QUALITY_DIMENSIONS, ScheduleSlot, compute_quality_metrics
+from squola.scheduler import (
+    QUALITY_DIMENSIONS,
+    QUALITY_INFO_DIMENSIONS,
+    ScheduleSlot,
+    compute_quality_metrics,
+)
 
 
 def slot(day: int, hour: int, class_id: int, teacher: str = "Azzurra Lami"):
@@ -65,6 +70,13 @@ def test_generation_reports_quality_metrics(client: TestClient):
     for dimension in QUALITY_DIMENSIONS:
         assert isinstance(quality[dimension], int)
         assert isinstance(quality["worst"][dimension], list)
+    # The three gap quantities are reported separately, and only the defect one
+    # ranks offenders.
+    for dimension in QUALITY_INFO_DIMENSIONS:
+        assert isinstance(quality[dimension], int)
+        assert dimension not in quality["worst"]
+    assert "excess_gap_hours" in quality
+    assert "gap_hours" not in quality
 
     # 5.4: the saved copy carries no metrics.
     schedule_id = client.get("/api/scheduling/schedules").json()[0]["id"]
@@ -80,3 +92,53 @@ def test_generation_without_data_reports_no_metrics(client: TestClient):
 
     assert generated.status_code == 400
     assert "quality" not in generated.text
+
+
+def test_break_day_is_counted_but_never_ranked_as_an_offender():
+    """A long day served with the break its teacher wanted is not a defect."""
+    slots = [slot(0, hour, 1) for hour in (1, 2, 4, 5)]
+
+    metrics = compute_quality_metrics(slots, {1: 5})
+
+    assert metrics["break_days"] == 1
+    assert metrics["excess_gap_hours"] == 0
+    assert metrics["worst"]["excess_gap_hours"] == []
+
+
+def test_day_past_its_allowance_is_ranked_with_the_excess_hours():
+    """1A 1A - 3A - 1C: two gap hours in one day, one of them excess."""
+    slots = [slot(0, 1, 1), slot(0, 2, 1), slot(0, 4, 3), slot(0, 6, 2)]
+
+    metrics = compute_quality_metrics(slots, {1: 5})
+
+    assert metrics["excess_gap_hours"] == 1
+    assert metrics["worst"]["excess_gap_hours"] == [
+        {"teacher": "Azzurra Lami", "day": "Monday", "value": 1}
+    ]
+
+
+def test_short_day_has_no_allowance_so_its_single_gap_is_excess():
+    slots = [slot(0, 1, 1), slot(0, 3, 1)]
+
+    metrics = compute_quality_metrics(slots, {1: 5})
+
+    assert metrics["excess_gap_hours"] == 1
+    assert metrics["missed_break_days"] == 0
+
+
+def test_long_day_without_its_break_is_counted_as_missed():
+    slots = [slot(0, hour, 1) for hour in (1, 2, 3, 4)]
+
+    metrics = compute_quality_metrics(slots, {1: 5})
+
+    assert metrics["missed_break_days"] == 1
+    assert metrics["break_days"] == 0
+
+
+def test_unavailable_slot_is_not_counted_as_a_gap_by_the_diagnostics():
+    """The diagnostics must measure the same hours the solver charges for."""
+    slots = [slot(0, 1, 1), slot(0, 3, 1)]
+
+    metrics = compute_quality_metrics(slots, {1: 5}, unavailable={(1, 0, 2)})
+
+    assert metrics["excess_gap_hours"] == 0

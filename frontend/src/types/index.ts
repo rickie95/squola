@@ -184,9 +184,14 @@ export interface ScheduleQualityOffender {
 
 export interface ScheduleQuality {
   class_blocks: number;
-  gap_hours: number;
+  /** Gap hours past the day's allowance of one. A defect: should be zero. */
+  excess_gap_hours: number;
   long_runs: number;
   balance_deviation: number;
+  /** Days using their allowed break. Not a defect. */
+  break_days: number;
+  /** Long days without their break. A defect only for MAXIMIZE_GAPS teachers. */
+  missed_break_days: number;
   worst: Record<string, ScheduleQualityOffender[]>;
 }
 

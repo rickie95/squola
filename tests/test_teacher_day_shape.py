@@ -11,7 +11,9 @@ from squola.models import (
     TeacherUnavailability,
 )
 from squola.scheduler import (
-    W_GAP,
+    ScheduleSlot,
+    W_BREAK_DAY,
+    W_BREAK_DAY_STRICT,
     W_LONG_RUN,
     W_TIME_PREFERENCE,
     ScheduleGenerator,
@@ -84,7 +86,9 @@ def solve_with_metrics(data: SchedulingData, time_limit_seconds: float = 10.0):
     generator = ScheduleGenerator(data)
     generator.build_model()
     schedule = generator.solve(time_limit_seconds=time_limit_seconds)
-    metrics = compute_quality_metrics(schedule.slots, generator.eligible_workdays)
+    metrics = compute_quality_metrics(
+        schedule.slots, generator.eligible_workdays, generator.unavailable
+    )
     return schedule, metrics
 
 
@@ -101,7 +105,16 @@ def hours_by_class(schedule, day: int) -> dict[int, list[int]]:
 
 def test_long_run_outweighs_taking_the_break():
     """Otherwise a teacher with a time preference keeps the four-hour run."""
-    assert W_LONG_RUN > W_GAP + 2 * W_TIME_PREFERENCE
+    assert W_LONG_RUN > W_BREAK_DAY + 2 * W_TIME_PREFERENCE
+
+
+def test_grouping_preference_sits_between_the_four_and_five_hour_gains():
+    """
+    Below the four-hour gain it would behave exactly like no preference at all;
+    above the five-hour gain it would keep five hours in a row, which nobody
+    asked for.
+    """
+    assert W_LONG_RUN < W_BREAK_DAY_STRICT + 2 * W_TIME_PREFERENCE < 2 * W_LONG_RUN
 
 
 # --- 2.3 / 2.4 preferences --------------------------------------------------
@@ -165,7 +178,8 @@ def test_two_matters_in_one_class_are_a_single_block():
 
     assert schedule.status == "OPTIMAL"
     assert metrics["class_blocks"] == 0
-    assert metrics["gap_hours"] == 0
+    assert metrics["excess_gap_hours"] == 0
+    assert metrics["break_days"] == 0
     hours = sorted(slot.hour for slot in schedule.slots)
     assert hours == list(range(hours[0], hours[0] + 4))
 
@@ -180,7 +194,8 @@ def test_two_hours_of_one_class_are_joined():
     )
 
     assert schedule.status == "OPTIMAL"
-    assert metrics["gap_hours"] == 0
+    assert metrics["excess_gap_hours"] == 0
+    assert metrics["break_days"] == 0
     assert metrics["class_blocks"] == 0
 
 
@@ -191,11 +206,11 @@ def test_free_hours_at_the_edges_of_the_day_are_not_gaps():
     schedule = generator.solve(time_limit_seconds=10.0)
 
     # Lessons sit somewhere inside a six-hour day, never at both edges.
-    assert compute_quality_metrics(schedule.slots, {1: 5})["gap_hours"] == 0
+    assert compute_quality_metrics(schedule.slots, {1: 5})["excess_gap_hours"] == 0
 
     edges = [slot for slot in schedule.slots]
     edges[0].hour, edges[1].hour = 1, 6
-    assert compute_quality_metrics(edges, {1: 5})["gap_hours"] == 4
+    assert compute_quality_metrics(edges, {1: 5})["excess_gap_hours"] == 4
 
 
 # --- 3.5 long runs ----------------------------------------------------------
@@ -207,7 +222,8 @@ def test_four_hour_day_takes_a_break():
     )
 
     assert metrics["long_runs"] == 0
-    assert metrics["gap_hours"] == 1
+    assert metrics["excess_gap_hours"] == 0
+    assert metrics["break_days"] == 1
 
 
 def test_five_hour_day_takes_a_break():
@@ -216,7 +232,8 @@ def test_five_hour_day_takes_a_break():
     )
 
     assert metrics["long_runs"] == 0
-    assert metrics["gap_hours"] == 1
+    assert metrics["excess_gap_hours"] == 0
+    assert metrics["break_days"] == 1
 
 
 def test_three_hour_day_stays_contiguous():
@@ -224,7 +241,8 @@ def test_three_hour_day_stays_contiguous():
         make_data([(1, 3)], unavailable_days={1, 2, 3, 4})
     )
 
-    assert metrics["gap_hours"] == 0
+    assert metrics["excess_gap_hours"] == 0
+    assert metrics["break_days"] == 0
     hours = sorted(slot.hour for slot in schedule.slots)
     assert hours == list(range(hours[0], hours[0] + 3))
 
@@ -270,3 +288,200 @@ def test_flexible_day_off_spreads_over_the_remaining_weekdays():
     loads = [sum(1 for slot in schedule.slots if slot.day == day) for day in range(5)]
     assert sorted(loads) == [0, 3, 3, 3, 3]
     assert metrics["balance_deviation"] == 0
+
+
+# --- unavailability is not a gap --------------------------------------------
+
+
+def test_unavailable_slot_between_two_lessons_is_not_a_gap():
+    """The teacher is not at school and is not waiting."""
+    metrics = compute_quality_metrics(
+        _slots_at(day=0, hours=[2, 4]), {1: 5}, unavailable={(1, 0, 3)}
+    )
+
+    assert metrics["excess_gap_hours"] == 0
+    assert metrics["break_days"] == 0
+
+
+def test_free_slot_next_to_an_unavailable_one_is_still_a_gap():
+    """Only the hour the teacher could have taught in counts."""
+    metrics = compute_quality_metrics(
+        _slots_at(day=0, hours=[1, 5]), {1: 5}, unavailable={(1, 0, 3), (1, 0, 4)}
+    )
+
+    assert metrics["excess_gap_hours"] == 1
+
+
+def test_solver_does_not_pay_for_a_gap_it_cannot_avoid():
+    """
+    Two hours either side of a blocked middle hour: the day is legal and carries
+    no excess, so the teacher is not pushed onto another arrangement.
+    """
+    data = make_data([(1, 2), (2, 2)], unavailable_days={1, 2, 3, 4})
+    data.unavailabilities = [
+        unavailability
+        for unavailability in data.unavailabilities
+        if unavailability.day_of_week != 0
+    ] + [
+        TeacherUnavailability(
+            id=900 + hour, workspace_id=1, teacher_id=1, day_of_week=0, hour_slot=hour
+        )
+        for hour in (1, 2)
+    ]
+
+    schedule, metrics = solve_with_metrics(data)
+
+    assert schedule.status in ("OPTIMAL", "FEASIBLE")
+    assert metrics["excess_gap_hours"] == 0
+
+
+# --- the allowance belongs to long days -------------------------------------
+
+
+def test_short_day_gets_no_gap_at_all():
+    """A three-hour day does not earn the break."""
+    _, metrics = solve_with_metrics(make_data([(1, 3)], unavailable_days={1, 2, 3, 4}))
+
+    assert metrics["excess_gap_hours"] == 0
+    assert metrics["break_days"] == 0
+
+
+def test_reduced_hours_teacher_gets_a_week_without_gaps():
+    """
+    Eight weekly hours over four days are two-hour days, which never earn the
+    allowance - the proportionality falls out of the day length alone.
+    """
+    schedule, metrics = solve_with_metrics(
+        make_data([(1, 4), (2, 4)], prefers_day_off=True)
+    )
+
+    assert schedule.status in ("OPTIMAL", "FEASIBLE")
+    assert len(schedule.slots) == 8
+    assert metrics["excess_gap_hours"] == 0
+    assert metrics["break_days"] == 0
+
+
+def test_no_day_ever_exceeds_its_allowance():
+    """The absolute rule, over a full five-day week."""
+    schedule, metrics = solve_with_metrics(
+        make_data([(1, 5), (2, 5), (3, 5), (4, 3)])
+    )
+
+    assert schedule.status in ("OPTIMAL", "FEASIBLE")
+    assert metrics["excess_gap_hours"] == 0
+    for day in range(5):
+        hours = sorted(slot.hour for slot in schedule.slots if slot.day == day)
+        if len(hours) > 1:
+            gaps = (hours[-1] - hours[0] + 1) - len(hours)
+            assert gaps <= 1, f"day {day} has {gaps} gap hours: {hours}"
+
+
+# --- preferences act on the week --------------------------------------------
+
+
+def test_grouping_preference_keeps_the_four_hour_day_contiguous():
+    schedule, metrics = solve_with_metrics(
+        make_data(
+            [(1, 2), (2, 2)],
+            unavailable_days={1, 2, 3, 4},
+            preference=SchedulePreference.MINIMIZE_GAPS.value,
+        )
+    )
+
+    assert metrics["break_days"] == 0
+    hours = sorted(slot.hour for slot in schedule.slots)
+    assert hours == list(range(hours[0], hours[0] + 4))
+
+
+def test_grouping_preference_still_breaks_the_five_hour_day():
+    _, metrics = solve_with_metrics(
+        make_data(
+            [(1, 3), (2, 2)],
+            unavailable_days={1, 2, 3, 4},
+            preference=SchedulePreference.MINIMIZE_GAPS.value,
+        )
+    )
+
+    assert metrics["break_days"] == 1
+    assert metrics["long_runs"] == 0
+
+
+def test_time_preference_still_buys_the_four_hour_break():
+    """
+    The case the old assert claimed to guarantee and did not: with the weight
+    modulated by a grouping preference the break stopped paying off.
+    """
+    _, metrics = solve_with_metrics(
+        make_data(
+            [(1, 2), (2, 2)],
+            unavailable_days={1, 2, 3, 4},
+            preference=SchedulePreference.EARLY.value,
+        )
+    )
+
+    assert metrics["break_days"] == 1
+    assert metrics["long_runs"] == 0
+
+
+def test_distribution_preference_spreads_the_break_over_the_week():
+    schedule, metrics = solve_with_metrics(
+        make_data(
+            [(1, 5), (2, 5), (3, 5), (4, 5)],
+            preference=SchedulePreference.MAXIMIZE_GAPS.value,
+        ),
+        time_limit_seconds=20.0,
+    )
+
+    assert schedule.status in ("OPTIMAL", "FEASIBLE")
+    assert metrics["excess_gap_hours"] == 0
+    # Four-hour days all week: every one of them should carry its own break
+    # rather than the week concentrating gaps into a single day.
+    assert metrics["break_days"] >= 4
+
+
+def test_distribution_preference_never_exceeds_the_allowance():
+    schedule, metrics = solve_with_metrics(
+        make_data(
+            [(1, 4), (2, 4)],
+            prefers_day_off=True,
+            preference=SchedulePreference.MAXIMIZE_GAPS.value,
+        )
+    )
+
+    assert schedule.status in ("OPTIMAL", "FEASIBLE")
+    assert metrics["excess_gap_hours"] == 0
+    assert metrics["break_days"] == 0  # two-hour days earn no allowance
+
+
+@pytest.mark.parametrize(
+    "preference",
+    [
+        SchedulePreference.NONE.value,
+        SchedulePreference.MINIMIZE_GAPS.value,
+        SchedulePreference.MAXIMIZE_GAPS.value,
+    ],
+)
+def test_gap_preferences_do_not_touch_class_contiguity(preference: str):
+    """Grouping and distribution say nothing about how classes are grouped."""
+    _, metrics = solve_with_metrics(
+        make_data([(1, 2), (2, 2)], unavailable_days={1, 2, 3, 4}, preference=preference)
+    )
+
+    assert metrics["class_blocks"] == 0
+
+
+def _slots_at(day: int, hours: list[int]) -> list[ScheduleSlot]:
+    return [
+        ScheduleSlot(
+            day=day,
+            hour=hour,
+            class_id=1,
+            class_name="IA",
+            matter_id=1,
+            matter_name="Matematica",
+            teacher_id=1,
+            teacher_name="Azzurra Lami",
+            assignment_id=1,
+        )
+        for hour in hours
+    ]

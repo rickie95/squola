@@ -68,15 +68,33 @@ timetable it found.
 
 | Term | Penalises | Weight |
 |---|---|---|
+| `W_EXCESS_GAP` | Each gap hour past the day's allowance | 986 |
 | `W_DAILY_BALANCE` | Daily load away from the band `[floor(T/D), ceil(T/D)]`, `T` weekly hours and `D` eligible weekdays | 16 |
-| `W_EXTRA_GAP` | Gap hours beyond the first in a day | 12 |
 | `W_CLASS_BLOCK` | Each start of a run of consecutive hours in one class | 10 |
+| `W_BREAK_DAY_STRICT` | A day using its allowance, for `MINIMIZE_GAPS` | 8 |
 | `W_LONG_RUN` | Each window of 4 consecutive teaching hours | 6 |
-| `W_GAP` | Each gap hour | 2 |
+| `W_BREAK_DAY` | A day using its allowance, for everyone else | 1 |
 | `W_TIME_PREFERENCE` | Distance from the preferred end of the day (`EARLY`/`LATE`) | 1 |
 
-`MINIMIZE_GAPS` doubles and `MAXIMIZE_GAPS` halves the gap and contiguity
-weights for that teacher; neither flips their sign.
+A day of at least `LONG_RUN_WINDOW` hours is allowed **one** gap hour - the break
+that makes a long day bearable. Shorter days get no allowance, so their first gap
+hour is already excess. "One gap is fine, two hours of gap never, two gaps in a
+day never" are all the same quantity: one two-hour interval and two one-hour
+intervals are both two gap hours, so the rule is simply *at most one gap hour per
+day*. The proportionality between workload and gaps follows from the same rule
+without a second mechanism: a teacher with few hours only has short days.
+
+Hours a teacher is unavailable for are not gaps - they are not at school and are
+not waiting.
+
+`W_EXCESS_GAP` is derived from the other weights, not hand-tuned: it is one more
+than everything else can gain in a whole week, so no other criterion can ever buy
+a second gap hour.
+
+`MINIMIZE_GAPS` and `MAXIMIZE_GAPS` act on **how many days of the week** carry
+their break, never on how deep a single day is cut, and they no longer touch class
+contiguity. `MAXIMIZE_GAPS` wants the break on every long day; `MINIMIZE_GAPS`
+keeps a four-hour day contiguous and only breaks a five-hour one.
 
 A flexible day off is not part of the objective: it is the hard constraint
 `sum(works_on_day) <= 4`. Spreading the load over the remaining weekdays follows
@@ -85,14 +103,20 @@ from the balance band.
 ### Quality Diagnostics
 
 A successful generation reports `metadata.quality` with a total per dimension -
-`class_blocks`, `gap_hours`, `long_runs`, `balance_deviation` - and, under
-`worst`, the teacher-day pairs contributing most to each. Computed from the
-extracted slots alone, and not persisted with saved schedules.
+`class_blocks`, `excess_gap_hours`, `long_runs`, `balance_deviation`,
+`break_days`, `missed_break_days` - and, under `worst`, the teacher-day pairs
+contributing most to each defect dimension. `break_days` and `missed_break_days`
+are informational and stay out of `worst`: a day served the way its teacher asked
+for is not an offender. Computed from the extracted slots and the teacher
+unavailabilities, and not persisted with saved schedules.
 
 Because the objective is now dense, `OPTIMAL` is rare and `FEASIBLE` is the norm
 within the time limit. `FEASIBLE` does not mean a worse timetable: on a realistic
-instance the solution quality plateaus within seconds while proving optimality
-does not finish. Read the quality metrics, not the status label.
+instance the solution quality plateaus while proving optimality does not finish.
+Read the quality metrics, not the status label. The dominant gap weight does slow
+the rest down: on 18 teachers / 15 classes / 360 hours, excess gap hours are zero
+from the start but `class_blocks` and `long_runs` are visibly worse at 30 seconds
+than at 120.
 
 ## Model Variables
 
@@ -110,9 +134,11 @@ For each assignment `a`, day `d` (0-4), and hour `h` (1-6):
     "total_slots": 125,
     "quality": {
       "class_blocks": 3,
-      "gap_hours": 11,
+      "excess_gap_hours": 0,
       "long_runs": 0,
       "balance_deviation": 2,
+      "break_days": 11,
+      "missed_break_days": 2,
       "worst": {
         "class_blocks": [{"teacher": "Azzurra Lami", "day": "Monday", "value": 2}]
       }
