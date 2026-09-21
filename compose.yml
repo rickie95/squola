@@ -2,12 +2,14 @@ services:
 
   frontend:
     image: squola/fe
+    restart: unless-stopped
     build: ./frontend
     ports:
       - 8080:80
 
   backend:
     image: squola/be
+    restart: unless-stopped
     build: .
     volumes:
       - ~/squolabk/current.db:/app/db/squola.db
