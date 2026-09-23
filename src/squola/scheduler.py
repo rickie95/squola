@@ -6,6 +6,7 @@ a valid weekly schedule for all classes, teachers, and matters.
 """
 
 import json
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -1049,8 +1050,8 @@ class ScheduleGenerator:
                     self.model.add(deviation >= low * works - load)
                 terms.append((W_DAILY_BALANCE, deviation))
 
-    def build_model(self) -> None:
-        """Build the complete CP model with all variables and constraints."""
+    def build_model(self, with_objective: bool = True) -> None:
+        """Build the CP model; without the objective it is a pure feasibility check."""
         self._create_variables()
 
         # Hard constraints
@@ -1068,7 +1069,8 @@ class ScheduleGenerator:
         self._add_at_least_one_lesson_of_two_hours_per_week_constraint()
 
         # Soft constraints (objectives)
-        self._add_objective()
+        if with_objective:
+            self._add_objective()
 
     def solve(self, time_limit_seconds: float = 120.0) -> GeneratedSchedule:
         """
@@ -1155,6 +1157,8 @@ def find_teachers_with_unsatisfiable_daily_workload(
     for assignment in data.assignments:
         assignments_by_teacher.setdefault(assignment.teacher_id, []).append(assignment)
 
+    # time_limit_seconds is a budget for the whole check, not per teacher.
+    deadline = time.monotonic() + time_limit_seconds
     unsatisfiable: list[Teacher] = []
     for teacher in data.teachers:
         assignments = assignments_by_teacher.get(teacher.id)
@@ -1174,10 +1178,13 @@ def find_teachers_with_unsatisfiable_daily_workload(
                 f for f in data.fixed_lessons if f.assignment_id in assignment_ids
             ],
         )
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break  # out of budget: report only what was proven
         generator = ScheduleGenerator(sub_data)
-        generator.build_model()
-        result = generator.solve(time_limit_seconds=time_limit_seconds)
-        if result.status not in ("OPTIMAL", "FEASIBLE"):
+        generator.build_model(with_objective=False)
+        result = generator.solve(time_limit_seconds=remaining)
+        if result.status == "INFEASIBLE":  # UNKNOWN (timeout) is not proof
             unsatisfiable.append(teacher)
 
     return unsatisfiable

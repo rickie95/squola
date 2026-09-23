@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { schedulingApi, teachersApi } from "../api";
+import { classesApi, schedulingApi, teachersApi } from "../api";
 import { getApiErrorMessage } from "../api/errors";
 import { downloadGlobalTeacherTimetable } from "../utils/globalTeacherTimetableExcel";
 import type {
@@ -284,7 +284,8 @@ export default function SchedulingPage() {
     setExportingTeacherTimetable(true);
     setError(null);
     try {
-      const teachers = await teachersApi.list();
+      const [teachers, classes] = await Promise.all([teachersApi.list(), classesApi.list()]);
+      const classColors = Object.fromEntries(classes.map((c) => [c.name, c.color]));
       const slotsByTeacher = tabMode === "generate"
         ? schedule!.schedule.by_teacher
         : selectedSavedSchedule!.schedule_data.by_teacher;
@@ -296,6 +297,7 @@ export default function SchedulingPage() {
         teachers,
         slotsByTeacher,
         scheduleName,
+        classColors,
       });
     } catch (error: unknown) {
       setError(getApiErrorMessage(error, "Errore durante l'esportazione Excel"));

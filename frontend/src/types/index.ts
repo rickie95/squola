@@ -106,6 +106,7 @@ export interface SchoolClass {
   year: string; // Roman numeral
   section: string; // Letter
   name: string; // Combined (e.g., "3A")
+  color: string; // #rrggbb, background in Excel export
 }
 
 export interface ClassMatterAssignment {
@@ -127,11 +128,13 @@ export interface SchoolClassWithAssignments extends SchoolClass {
 export interface SchoolClassCreate {
   year: string;
   section: string;
+  color?: string;
 }
 
 export interface SchoolClassUpdate {
   year?: string;
   section?: string;
+  color?: string;
 }
 
 export interface ClassMatterAssignmentCreate {

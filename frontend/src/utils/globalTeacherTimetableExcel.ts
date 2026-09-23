@@ -32,7 +32,17 @@ interface GlobalTeacherTimetableExport {
   teachers: Teacher[];
   slotsByTeacher: Record<string, ScheduleSlot[]>;
   scheduleName: string;
+  classColors: Record<string, string>; // class name -> #rrggbb
 }
+
+// WCAG contrast ratio of a #rrggbb background against black text.
+const contrastWithBlack = (hex: string): number => {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b + 0.05) / 0.05;
+};
 
 const getDayIndex = (day: string): number | undefined => {
   const normalizedDay = day.trim().toLowerCase();
@@ -66,6 +76,7 @@ export async function downloadGlobalTeacherTimetable({
   teachers,
   slotsByTeacher,
   scheduleName,
+  classColors,
 }: GlobalTeacherTimetableExport): Promise<void> {
   const { Workbook } = await import("exceljs");
   const workbook = new Workbook();
@@ -138,7 +149,16 @@ export async function downloadGlobalTeacherTimetable({
         continue;
       }
 
-      row.getCell(2 + dayIndex * HOUR_ORDER.length + hourIndex).value = slot.class;
+      const cell = row.getCell(2 + dayIndex * HOUR_ORDER.length + hourIndex);
+      cell.value = slot.class;
+
+      const color = classColors[slot.class];
+      if (color) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${color.slice(1).toUpperCase()}` } };
+        if (contrastWithBlack(color) < 4.5) {
+          cell.font = { color: { argb: "FFFFFFFF" } };
+        }
+      }
     }
   });
 

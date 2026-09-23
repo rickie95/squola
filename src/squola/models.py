@@ -205,6 +205,14 @@ class TeacherUnavailability(Base):
         return f"TeacherUnavailability(teacher_id={self.teacher_id}, day={self.day_of_week}, slot={self.hour_slot})"
 
 
+# Light tints (contrast >= 4.5:1 with black text), hue-interleaved so the first classes differ clearly.
+CLASS_COLOR_PALETTE = [
+    "#f5bcbc", "#f5debc", "#eaf5bc", "#c8f5bc", "#bcf5d3", "#bcf5f5", "#bcd3f5", "#c8bcf5", "#eabcf5", "#f5bcde",
+    "#efac8f", "#efe58f", "#bfef8f", "#8fef99", "#8fefd2", "#8fd2ef", "#8f99ef", "#bf8fef", "#ef8fe6", "#ef8fac",
+    "#fae0db", "#faf2db", "#effadb", "#ddfadb", "#dbfaec", "#dbf5fa", "#dbe3fa", "#e6dbfa", "#f8dbfa", "#fadbe9",
+]
+
+
 class SchoolClass(Base):
     """School class model."""
 
@@ -217,6 +225,7 @@ class SchoolClass(Base):
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), nullable=False, index=True)
     year: Mapped[str] = mapped_column(String(10))  # Arabic numeral: 1, 2, 3, 4, 5
     section: Mapped[str] = mapped_column(String(5))  # Letter: A, B, C, etc.
+    color: Mapped[str] = mapped_column(String(7))  # Excel export background, #rrggbb
 
     workspace: Mapped["Workspace"] = relationship(back_populates="classes")
     matter_assignments: Mapped[list["ClassMatterAssignment"]] = relationship(

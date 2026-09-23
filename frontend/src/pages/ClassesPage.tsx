@@ -255,6 +255,17 @@ export default function ClassesPage() {
     setSelectedClass(fullClass);
   };
 
+  const handleColorChange = async (color: string) => {
+    if (!selectedClass) return;
+    await classesApi.update(selectedClass.id, { color });
+    setSelectedClass({ ...selectedClass, color });
+    queryClient.invalidateQueries({ queryKey: ["classes"] });
+  };
+
+  const duplicateColorClasses = selectedClass
+    ? (classes ?? []).filter((c) => c.id !== selectedClass.id && c.color === selectedClass.color)
+    : [];
+
   const handleClassSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingClass) {
@@ -405,6 +416,18 @@ export default function ClassesPage() {
                       onClick={() => handleSelectClass(schoolClass)}
                     >
                       <td>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: "0.8rem",
+                            height: "0.8rem",
+                            marginRight: "0.5rem",
+                            borderRadius: "2px",
+                            border: "1px solid var(--border-color)",
+                            backgroundColor: schoolClass.color,
+                            verticalAlign: "middle",
+                          }}
+                        />
                         <strong>{schoolClass.name}</strong>
                       </td>
                       <td>
@@ -459,6 +482,20 @@ export default function ClassesPage() {
             <h3>{selectedClass ? `Class ${selectedClass.name} - Subjects` : "Select a Class"}</h3>
             {selectedClass ? (<h4> {selectedClass.matter_assignments.reduce((accu, assignment) => accu + assignment.hours_per_week, 0)}/30 hours </h4>) : null}
             {selectedClass && (
+              <label title="Colore nell'export Excel" style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                Colore
+                <input
+                  key={selectedClass.id}
+                  type="color"
+                  defaultValue={selectedClass.color}
+                  // Native "change" fires once when the picker closes; React's onChange fires on every drag step.
+                  ref={(el) => {
+                    if (el) el.onchange = () => handleColorChange(el.value);
+                  }}
+                />
+              </label>
+            )}
+            {selectedClass && (
               <button className="btn btn-primary btn-sm" onClick={() => openAssignmentModal()}>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" width="16" height="16">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -470,6 +507,11 @@ export default function ClassesPage() {
 
           {selectedClass ? (
             <>
+              {duplicateColorClasses.length > 0 && (
+                <p className="form-error">
+                  Colore già usato da: {duplicateColorClasses.map((c) => c.name).join(", ")}
+                </p>
+              )}
               {selectedClass.matter_assignments.length > 0 ? (
                 <div className="assignment-list">
                 {selectedClass.matter_assignments.map((assignment) => (

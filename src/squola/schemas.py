@@ -159,21 +159,26 @@ class SchoolClassBase(BaseModel):
     section: str = Field(..., min_length=1, max_length=5, description="Section letter (A, B, C, etc.)")
 
 
+HEX_COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
+
+
 class SchoolClassCreate(SchoolClassBase):
     """Schema for creating a school class."""
-    pass
+    color: str | None = Field(None, pattern=HEX_COLOR_PATTERN, description="Background color #rrggbb; defaults from palette")
 
 
 class SchoolClassUpdate(BaseModel):
     """Schema for updating a school class."""
     year: str | None = Field(None, min_length=1, max_length=10)
     section: str | None = Field(None, min_length=1, max_length=5)
+    color: str | None = Field(None, pattern=HEX_COLOR_PATTERN)
 
 
 class SchoolClassResponse(SchoolClassBase):
     """Schema for school class response."""
     id: int
     name: str = Field(..., description="Full class name (e.g., 3A)")
+    color: str
 
     model_config = {"from_attributes": True}
 

@@ -8,6 +8,7 @@ from squola.auth import get_current_workspace
 from squola.database import get_db
 from squola.scheduler import requirement_conflict
 from squola.models import (
+    CLASS_COLOR_PALETTE,
     ClassMatterAssignment,
     FixedClassLesson,
     Matter,
@@ -370,11 +371,19 @@ def create_class(
         workspace_id=workspace.id,
         year=class_data.year,
         section=class_data.section,
+        color=(class_data.color or _default_class_color(workspace.id, db)).lower(),
     )
     db.add(school_class)
     db.commit()
     db.refresh(school_class)
     return school_class
+
+
+def _default_class_color(workspace_id: int, db: Session) -> str:
+    """First palette color unused in the workspace; cycles once the palette is exhausted."""
+    used = list(db.scalars(select(SchoolClass.color).where(SchoolClass.workspace_id == workspace_id)))
+    free = next((c for c in CLASS_COLOR_PALETTE if c not in used), None)
+    return free or CLASS_COLOR_PALETTE[len(used) % len(CLASS_COLOR_PALETTE)]
 
 
 @router.put("/{class_id}", response_model=SchoolClassResponse)
@@ -415,6 +424,8 @@ def update_class(
 
     school_class.year = new_year
     school_class.section = new_section
+    if class_data.color is not None:
+        school_class.color = class_data.color.lower()
 
     db.commit()
     db.refresh(school_class)
@@ -480,6 +491,7 @@ def clone_class(
         workspace_id=workspace.id,
         year=class_data.year,
         section=class_data.section,
+        color=(class_data.color or _default_class_color(workspace.id, db)).lower(),
     )
     db.add(new_class)
     db.flush()  # Get new_class.id without committing yet
