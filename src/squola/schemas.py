@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from squola.auth import PASSWORD_MIN_LENGTH
 from squola.models import MatterRequirements, TeacherUnavailability
+from squola.scheduler import DAYS_OF_WEEK, HOURS_PER_DAY
 
 
 class SchedulePreference(str, Enum):
@@ -289,6 +290,43 @@ class SavedScheduleResponse(SavedScheduleListResponse):
     schedule_data: dict  # Parsed JSON
 
     model_config = {"from_attributes": True}
+
+
+# ============ Schedule Swap Schemas ============
+
+class SwapSlot(BaseModel):
+    """A weekly slot: day 0-4 (Monday-Friday), hour 1-6."""
+    day: int = Field(ge=0, lt=DAYS_OF_WEEK)
+    hour: int = Field(ge=1, le=HOURS_PER_DAY)
+
+    def as_tuple(self) -> tuple[int, int]:
+        return (self.day, self.hour)
+
+
+class AppliedSwap(BaseModel):
+    """A swap already applied to the draft: lesson (teacher_id, s1) exchanged with s2."""
+    teacher_id: int
+    s1: SwapSlot
+    s2: SwapSlot
+
+
+class SwapDraftRequest(BaseModel):
+    """The swaps applied so far, replayed on the saved schedule."""
+    applied: list[AppliedSwap] = Field(default_factory=list)
+
+    def applied_tuples(self) -> list[tuple[int, tuple[int, int], tuple[int, int]]]:
+        return [(a.teacher_id, a.s1.as_tuple(), a.s2.as_tuple()) for a in self.applied]
+
+
+class SwapSuggestRequest(SwapDraftRequest):
+    """Ask for the swaps of the lesson taught by teacher_id in slot."""
+    teacher_id: int
+    slot: SwapSlot
+
+
+class SwapSaveRequest(SwapDraftRequest):
+    """Save the draft as a new schedule."""
+    nickname: str | None = Field(None, max_length=255)
 
 
 # Rebuild models to resolve forward references

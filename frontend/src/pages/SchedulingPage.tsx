@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { Link, useLocation } from "react-router-dom";
 import { classesApi, schedulingApi, teachersApi } from "../api";
 import { getApiErrorMessage } from "../api/errors";
 import { downloadGlobalTeacherTimetable } from "../utils/globalTeacherTimetableExcel";
@@ -143,7 +144,10 @@ function WeeklyTimetableGrid({
 }
 
 export default function SchedulingPage() {
-  const [tabMode, setTabMode] = useState<TabMode>("generate");
+  const location = useLocation();
+  const [tabMode, setTabMode] = useState<TabMode>(
+    (location.state as { tab?: TabMode } | null)?.tab ?? "generate"
+  );
   const [preview, setPreview] = useState<SchedulingPreview | null>(null);
   const [schedule, setSchedule] = useState<GeneratedSchedule | null>(null);
   const [savedSchedules, setSavedSchedules] = useState<SavedScheduleListItem[]>([]);
@@ -523,6 +527,13 @@ export default function SchedulingPage() {
                         >
                           Visualizza
                         </button>
+                        <Link
+                          to={`/scheduling/${s.id}/swaps`}
+                          className="btn btn-secondary"
+                          style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}
+                        >
+                          Cambi
+                        </Link>
                         <button
                           className="btn btn-danger"
                           style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}

@@ -313,3 +313,60 @@ export interface ChangePasswordRequest {
 export interface RenameWorkspaceRequest {
   name: string;
 }
+
+// ============ Schedule swaps ============
+
+export interface SwapSlot {
+  day: number; // 0-4
+  hour: number; // 1-6
+}
+
+export interface AppliedSwap {
+  teacher_id: number;
+  s1: SwapSlot;
+  s2: SwapSlot;
+}
+
+export interface DraftLesson extends SwapSlot {
+  teacher: string;
+  class: string;
+  matter: string;
+  teacher_id: number;
+  class_id: number;
+  matter_id: number;
+  assignment_id: number;
+}
+
+export interface SwapCell {
+  class_id: number;
+  class: string;
+  matter: string;
+}
+
+export interface SwapCandidateTeacher {
+  teacher_id: number;
+  teacher: string;
+  before_s1: SwapCell | null;
+  before_s2: SwapCell | null;
+}
+
+export interface SwapWarning {
+  teacher_id: number;
+  teacher: string;
+  day: number;
+  metric: "excess_gap_hours" | "long_runs";
+  before: number;
+  after: number;
+}
+
+export interface SwapCandidate {
+  s2: SwapSlot;
+  teachers: SwapCandidateTeacher[];
+  warnings: SwapWarning[];
+}
+
+export interface UnlinkedLesson extends SwapSlot {
+  class: string;
+  teacher: string;
+  matter: string;
+}

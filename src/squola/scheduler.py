@@ -30,6 +30,7 @@ from squola.models import (
 DAYS_OF_WEEK = 5  # Monday to Friday (0-4)
 HOURS_PER_DAY = 6  # 8:00 to 14:00 (slots 1-6)
 LEGAL_DAILY_TEACHING_HOURS = [0, 2, 3, 4, 5]
+WORKDAY_TEACHING_HOURS = [h for h in LEGAL_DAILY_TEACHING_HOURS if h]  # a day taught at all
 MAX_DAILY_ASSIGNMENT_HOURS = 3  # hours of one matter-class assignment in one day
 LONG_RUN_WINDOW = 4  # consecutive teaching hours that start to hurt
 
@@ -153,6 +154,15 @@ def fully_unavailable_days(
     }
 
 
+def uses_flexible_day_off(teacher: Teacher, fully_unavailable: set[int]) -> bool:
+    """
+    Whether the teacher's free weekday is theirs to place. A legacy contradictory
+    record is treated like a hard full-day block: hard unavailability takes
+    precedence over a flexible request.
+    """
+    return bool(teacher.prefers_day_off) and not fully_unavailable
+
+
 def teacher_workweek_infeasibility_message(
     data: "SchedulingData", teacher: Teacher
 ) -> str:
@@ -164,7 +174,7 @@ def teacher_workweek_infeasibility_message(
     )
     fully_blocked = fully_unavailable_days(data.unavailabilities, teacher.id)
 
-    if teacher.prefers_day_off and not fully_blocked and weekly_hours > 4 * 5:
+    if uses_flexible_day_off(teacher, fully_blocked) and weekly_hours > 4 * 5:
         return (
             f"Teacher {teacher.first_name} {teacher.last_name} has {weekly_hours} weekly "
             "hours, but a flexible day off requires at least one fully free weekday "
@@ -212,6 +222,15 @@ class ScheduleSlot:
     matter_name: str
     assignment_id: int
 
+    def ids(self) -> dict[str, int]:
+        """Identifiers saved next to the names, so an edit can find the lesson again."""
+        return {
+            "teacher_id": self.teacher_id,
+            "class_id": self.class_id,
+            "matter_id": self.matter_id,
+            "assignment_id": self.assignment_id,
+        }
+
 
 @dataclass
 class GeneratedSchedule:
@@ -253,6 +272,7 @@ class GeneratedSchedule:
                 "hour": HOUR_LABELS[slot.hour - 1],
                 "teacher": slot.teacher_name,
                 "matter": slot.matter_name,
+                **slot.ids(),
             })
         # Sort each class's slots by day and hour
         for class_name in result:
@@ -272,6 +292,7 @@ class GeneratedSchedule:
                 "hour": HOUR_LABELS[slot.hour - 1],
                 "class": slot.class_name,
                 "matter": slot.matter_name,
+                **slot.ids(),
             })
         for teacher_name in result:
             result[teacher_name].sort(
@@ -290,6 +311,7 @@ class GeneratedSchedule:
                 "class": slot.class_name,
                 "teacher": slot.teacher_name,
                 "matter": slot.matter_name,
+                **slot.ids(),
             })
         for day_name in result:
             result[day_name].sort(key=lambda x: HOUR_LABELS.index(x["hour"]))
@@ -554,7 +576,9 @@ class ScheduleGenerator:
         self.eligible_workdays: dict[int, int] = {}
         for teacher in self.data.teachers:
             blocked = len(self.fully_unavailable_by_teacher[teacher.id])
-            flexible = 1 if teacher.prefers_day_off and not blocked else 0
+            flexible = 1 if uses_flexible_day_off(
+                teacher, self.fully_unavailable_by_teacher[teacher.id]
+            ) else 0
             self.eligible_workdays[teacher.id] = DAYS_OF_WEEK - blocked - flexible
 
         # Build requirement-based assignment lookups
@@ -667,9 +691,7 @@ class ScheduleGenerator:
             teacher = next(teacher for teacher in self.data.teachers if teacher.id == teacher_id)
             fully_unavailable = self.fully_unavailable_by_teacher[teacher_id]
 
-            # A legacy contradictory record is treated like a hard full-day block:
-            # hard unavailability takes precedence over a flexible request.
-            uses_flexible_day = teacher.prefers_day_off and not fully_unavailable
+            uses_flexible_day = uses_flexible_day_off(teacher, fully_unavailable)
             for day in range(DAYS_OF_WEEK):
                 day_hours = [
                     self.x[(assignment.id, day, hour)]
@@ -679,15 +701,15 @@ class ScheduleGenerator:
                 if not uses_flexible_day:
                     if day not in fully_unavailable:
                         self.model.add_linear_expression_in_domain(
-                            sum(day_hours), cp_model.Domain.from_values([2, 3, 4, 5])
+                            sum(day_hours), cp_model.Domain.from_values(WORKDAY_TEACHING_HOURS)
                         )
                     continue
 
                 works_on_day = self.model.new_bool_var(
                     f"teacher_{teacher_id}_works_day_{day}"
                 )
-                self.model.add(sum(day_hours) >= 2 * works_on_day)
-                self.model.add(sum(day_hours) <= 5 * works_on_day)
+                self.model.add(sum(day_hours) >= min(WORKDAY_TEACHING_HOURS) * works_on_day)
+                self.model.add(sum(day_hours) <= max(WORKDAY_TEACHING_HOURS) * works_on_day)
                 self.works_on_day[(teacher_id, day)] = works_on_day
 
             if uses_flexible_day:
