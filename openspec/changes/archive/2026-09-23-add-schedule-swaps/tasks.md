@@ -24,8 +24,8 @@
 
 - [x] 5.1 Estrarre da `frontend/src/utils/globalTeacherTimetableExcel.ts` la conversione slot -> righe docente x (giorno, ora) in una funzione condivisa, usata dall'export. Verificare che l'export Excel produca lo stesso file di prima e che `npm run build` passi.
 - [x] 5.2 Aggiungere tipi e chiamate API per suggest/save in `frontend/src/types` e `frontend/src/api/index.ts`. Verificare con `npm run build`.
-- [ ] 5.3 Creare la pagina `SwapsPage` sulla rotta `/scheduling/:id/swaps`: griglia globale con colori classe, selezione cella, lista suggerimenti con docenti prima/dopo e avvisi, evidenziazione nella griglia al passaggio su un suggerimento, applica, annulla ultimo, salva con nickname. Mostrare l'errore 409 elencando le lezioni non ricollegate. Verificare a mano con `uv run squola` + `npm run dev` il percorso completo: applica due cambi, annulla uno, salva, il nuovo orario compare nella lista e l'origine e' invariata.
-- [ ] 5.4 Aggiungere in `SchedulingPage.tsx` il bottone "Cambi" sull'orario salvato che porta alla nuova pagina. Verificare la navigazione a mano.
+- [x] 5.3 Creare la pagina `SwapsPage` sulla rotta `/scheduling/:id/swaps`: griglia globale con colori classe, selezione cella, lista suggerimenti con docenti prima/dopo e avvisi, evidenziazione nella griglia al passaggio su un suggerimento, applica, annulla ultimo, salva con nickname. Mostrare l'errore 409 elencando le lezioni non ricollegate. Verificare a mano con `uv run squola` + `npm run dev` il percorso completo: applica due cambi, annulla uno, salva, il nuovo orario compare nella lista e l'origine e' invariata.
+- [x] 5.4 Aggiungere in `SchedulingPage.tsx` il bottone "Cambi" sull'orario salvato che porta alla nuova pagina. Verificare la navigazione a mano.
 
 ## 6. Documentazione
 
