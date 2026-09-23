@@ -26,6 +26,10 @@ import type {
   SavedScheduleListItem,
   SavedSchedule,
   SavedScheduleUpdate,
+  AppliedSwap,
+  DraftLesson,
+  SwapCandidate,
+  SwapSlot,
   AuthSession,
   RegisterRequest,
   LoginRequest,
@@ -264,6 +268,41 @@ export const schedulingApi = {
 
   deleteSaved: async (id: number): Promise<void> => {
     await api.delete(`/scheduling/schedules/${id}`);
+  },
+
+  // Manual swaps: the draft is the saved schedule plus the applied swaps.
+  swapDraft: async (id: number, applied: AppliedSwap[]): Promise<DraftLesson[]> => {
+    const response = await api.post<{ lessons: DraftLesson[] }>(
+      `/scheduling/schedules/${id}/swaps/draft`,
+      { applied }
+    );
+    return response.data.lessons;
+  },
+
+  suggestSwaps: async (
+    id: number,
+    applied: AppliedSwap[],
+    teacherId: number,
+    slot: SwapSlot
+  ): Promise<SwapCandidate[]> => {
+    const response = await api.post<SwapCandidate[]>(`/scheduling/schedules/${id}/swaps/suggest`, {
+      applied,
+      teacher_id: teacherId,
+      slot,
+    });
+    return response.data;
+  },
+
+  saveSwaps: async (
+    id: number,
+    applied: AppliedSwap[],
+    nickname: string | null
+  ): Promise<SavedScheduleListItem> => {
+    const response = await api.post<SavedScheduleListItem>(`/scheduling/schedules/${id}/swaps/save`, {
+      applied,
+      nickname,
+    });
+    return response.data;
   },
 };
 

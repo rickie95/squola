@@ -12,12 +12,21 @@ from sqlalchemy.orm import Session
 from squola.auth import get_current_workspace
 from squola.database import get_db
 from squola.models import SavedSchedule, Workspace
-from squola.scheduler import generate_schedule, GeneratedSchedule
+from squola.scheduler import (
+    GeneratedSchedule,
+    fetch_scheduling_data,
+    generate_schedule,
+    save_schedule_to_db,
+)
 from squola.schemas import (
     SavedScheduleListResponse,
     SavedScheduleResponse,
     SavedScheduleUpdate,
+    SwapDraftRequest,
+    SwapSaveRequest,
+    SwapSuggestRequest,
 )
+from squola.swaps import SwapContext, SwapError, load_lessons, replay, suggest
 
 
 router = APIRouter(prefix="/scheduling", tags=["scheduling"])
@@ -380,3 +389,99 @@ def delete_saved_schedule(
     
     db.delete(schedule)
     db.commit()
+
+
+# ============ Manual swaps ============
+
+def _load_draft(
+    schedule_id: int, request: SwapDraftRequest, db: Session, workspace: Workspace
+) -> tuple[SavedSchedule, SwapContext, list]:
+    """The saved schedule with the requested swaps replayed on current data."""
+    schedule = (
+        db.query(SavedSchedule)
+        .filter(SavedSchedule.id == schedule_id, SavedSchedule.workspace_id == workspace.id)
+        .first()
+    )
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+
+    ctx = SwapContext(fetch_scheduling_data(db, workspace_id=workspace.id))
+    lessons, unlinked = load_lessons(json.loads(schedule.schedule_data), ctx)
+    if unlinked:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Some lessons no longer match a current assignment",
+                "unlinked": unlinked,
+            },
+        )
+    try:
+        lessons = replay(lessons, ctx, request.applied_tuples())
+    except SwapError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    return schedule, ctx, lessons
+
+
+@router.post("/schedules/{schedule_id}/swaps/draft")
+def get_swap_draft(
+    schedule_id: int,
+    request: SwapDraftRequest,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> dict[str, Any]:
+    """The lessons of a saved schedule after the applied swaps."""
+    _, ctx, lessons = _load_draft(schedule_id, request, db, workspace)
+    return {
+        "lessons": [
+            {
+                "day": slot.day,
+                "hour": slot.hour,
+                "teacher": slot.teacher_name,
+                "class": slot.class_name,
+                "matter": slot.matter_name,
+                **slot.ids(),
+            }
+            for slot in map(ctx.to_schedule_slot, lessons)
+        ]
+    }
+
+
+@router.post("/schedules/{schedule_id}/swaps/suggest")
+def suggest_swaps(
+    schedule_id: int,
+    request: SwapSuggestRequest,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> list[dict[str, Any]]:
+    """Admissible swaps for one lesson of the draft, clean ones first."""
+    _, ctx, lessons = _load_draft(schedule_id, request, db, workspace)
+    return suggest(lessons, ctx, request.teacher_id, request.slot.as_tuple())
+
+
+@router.post("/schedules/{schedule_id}/swaps/save", response_model=SavedScheduleListResponse)
+def save_swaps(
+    schedule_id: int,
+    request: SwapSaveRequest,
+    db: Session = Depends(get_db),
+    workspace: Workspace = Depends(get_current_workspace),
+) -> SavedScheduleListResponse:
+    """Save the draft as a new schedule; the original stays unchanged."""
+    if not request.applied:
+        raise HTTPException(status_code=422, detail="No swap to save")
+    origin, ctx, lessons = _load_draft(schedule_id, request, db, workspace)
+    edited = GeneratedSchedule(
+        slots=[ctx.to_schedule_slot(lesson) for lesson in lessons],
+        status="MANUAL",
+        solve_time_seconds=0.0,
+    )
+    nickname = request.nickname or f"{origin.nickname or origin.name} (cambi)"
+    saved = save_schedule_to_db(db, workspace.id, edited, nickname)
+    return SavedScheduleListResponse(
+        id=saved.id,
+        name=saved.name,
+        nickname=saved.nickname,
+        status=saved.status,
+        solve_time_seconds=saved.solve_time_seconds,
+        total_slots=saved.total_slots,
+        created_at=saved.created_at.isoformat(),
+    )

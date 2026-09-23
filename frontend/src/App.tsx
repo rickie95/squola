@@ -10,6 +10,7 @@ import TeachersPage from "./pages/TeachersPage";
 import ClassesPage from "./pages/ClassesPage";
 import TeacherDetailPage from "./pages/TeacherDetailPage";
 import SchedulingPage from "./pages/SchedulingPage";
+import SwapsPage from "./pages/SwapsPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import AccountPage from "./pages/AccountPage";
@@ -43,6 +44,7 @@ function App() {
                       <Route path="/teachers/:id" element={<TeacherDetailPage />} />
                       <Route path="/classes" element={<ClassesPage />} />
                       <Route path="/scheduling" element={<SchedulingPage />} />
+                      <Route path="/scheduling/:id/swaps" element={<SwapsPage />} />
                       <Route path="/account" element={<AccountPage />} />
                     </Routes>
                   </Layout>
